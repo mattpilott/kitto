@@ -1,0 +1,8 @@
+.github
+.prettierrc
+docs
+index.html
+lib/_template
+vite.config.js
+*/**/test.js
+*/**/bench.js
