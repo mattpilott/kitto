@@ -1,8 +1,14 @@
 .github
 .prettierrc
+bin
+demo
 docs
 index.html
-lib/_template
+bun.lockb
+eslint.config.js
+prettier.config.js
+todo.md
+tsconfig.json
 vite.config.js
 */**/test.js
 */**/bench.js

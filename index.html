@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<style>
+			body {
+				height: 2000px;
+			}
+		</style>
+	</head>
+	<body>
+		Test
+		<script type="module">
+			import 'kitto/unify'
+			import { findIndex, formatDate, formatElapse } from 'kitto'
+			// import { niceDate, niceSince } from '$lib/index.js'
+
+			console.log(formatDate('{Do} {MMMM} {YYYY}'))
+			console.log(formatElapse(new Date(new Date().setDate(new Date().getDate() - 1))))
+		</script>
+	</body>
+</html>

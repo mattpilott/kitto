@@ -1,0 +1,363 @@
+/*----------------------------------------------------------------------------*\
+   #REBOOT BROWSER STYLES
+
+   - Version:      1.0.0
+   - Site:         https://github.com/marbyco/kitto
+   – License:      MIT | http://goo.gl/p3bexl
+\*----------------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------------*\
+   1. Remove repeating backgrounds in all browsers (opinion).
+   2. Set background position to center apart from to pseudos (opinion).
+   3. Set background size to cover in all browsers (opinion).
+   4. Add box sizing in all browsers (opinion).
+   5. Add relative positioning (opinion).
+\*----------------------------------------------------------------------------*/
+
+*,
+::before,
+::after {
+	background-repeat: no-repeat; /* 1 */
+	background-position: center; /* 2 */
+	background-size: cover; /* 3 */
+	box-sizing: border-box; /* 4 */
+	position: relative; /* 5 */
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Add text decoration inheritance in all browsers (opinion).
+   2. Add vertical alignment inheritance in all browsers (opinion).
+\*----------------------------------------------------------------------------*/
+
+::before,
+::after {
+	text-decoration: inherit; /* 1 */
+	vertical-align: inherit; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Add the default cursor in all browsers (opinion).
+   2. Add a flattened line height in all browsers (opinion).
+   3. Use a 3-space tab width in all browsers (opinion).
+   4. Remove iOS tap highlight (opinion).
+   5. Prevent font size adjustments after orientation changes in iOS.
+\*----------------------------------------------------------------------------*/
+
+html {
+	/* hanging-punctuation: first last; */
+	cursor: default; /* 1 */
+	line-height: 1.4; /* 2 */
+	-moz-tab-size: 3; /* 3 */
+	tab-size: 3; /* 3 */
+	-webkit-tap-highlight-color: transparent; /* 4 */
+	-ms-text-size-adjust: 100%; /* 5 */
+	-webkit-text-size-adjust: 100%; /* 5 */
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Set default font stack to leverage systom font (opinion)
+   2. Remove margin in all browsers. (opinion)
+\*----------------------------------------------------------------------------*/
+
+body {
+	font-family:
+		system-ui,
+		-apple-system,
+		'Segoe UI',
+		Roboto,
+		Helvetica,
+		Arial,
+		sans-serif,
+		'Apple Color Emoji',
+		'Segoe UI Emoji'; /* 1 */
+	margin: 0; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Correct the font sizes and margins on `h1` elements within `section` and
+   `article` contexts in Chrome, Firefox, and Safari
+\*----------------------------------------------------------------------------*/
+
+h1 {
+	font-size: 2em;
+	margin: 0.6875em 0;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Correct the inheritance of border color in Firefox.
+   2. Add the correct box sizing in Firefox.
+\*----------------------------------------------------------------------------*/
+
+hr {
+	color: inherit; /* 1 */
+	height: 0; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the list style on navigation lists in all browsers (opinion).
+\*----------------------------------------------------------------------------*/
+
+nav ol,
+nav ul {
+	list-style: none;
+	padding: 0;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Set default font stack to leverage systom font (opinion)
+   2. Correct the odd `em` font sizing in all browsers.
+\*----------------------------------------------------------------------------*/
+
+code,
+kbd,
+pre,
+samp {
+	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace; /* 1 */
+	font-size: 1em; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Add the correct text decoration in Edge, Opera, and Safari.
+\*----------------------------------------------------------------------------*/
+
+abbr[title] {
+	text-decoration: underline dotted;
+}
+
+/*----------------------------------------------------------------------------*\
+   Add the correct font weight in Chrome, Edge, and Safari.
+\*----------------------------------------------------------------------------*/
+
+b,
+strong {
+	font-weight: bolder;
+}
+
+/*----------------------------------------------------------------------------*\
+   Correct the font size in all browsers.
+\*----------------------------------------------------------------------------*/
+
+small {
+	font-size: 83.3333%;
+}
+
+/*----------------------------------------------------------------------------*\
+   Stop 'sub' and 'sup' elements affecting line height in all browsers.
+\*----------------------------------------------------------------------------*/
+
+sub,
+sup {
+	font-size: 75%;
+	line-height: 0;
+	position: relative;
+	vertical-align: baseline;
+}
+
+sub {
+	bottom: -0.25em;
+}
+
+sup {
+	top: -0.5em;
+}
+
+/*----------------------------------------------------------------------------*\
+   Change the alignment on media elements in all browers (opinion).
+\*----------------------------------------------------------------------------*/
+
+audio,
+canvas,
+iframe,
+img,
+svg,
+video {
+	vertical-align: middle;
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the border on iframes in all browsers (opinion).
+\*----------------------------------------------------------------------------*/
+
+img,
+iframe {
+	border-style: none;
+}
+
+/*----------------------------------------------------------------------------*\
+   Set sensible defaults for img, svg (opinion/m).
+\*----------------------------------------------------------------------------*/
+
+img,
+picture,
+svg {
+	display: block;
+	max-width: 100%;
+}
+
+img {
+	height: auto;
+}
+
+figure {
+	margin: 0;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Remove border spacing in all browsers (opinion).
+   2. Correct table border color inheritance
+   3. Remove text indentation from table contents
+\*----------------------------------------------------------------------------*/
+
+table {
+	border-collapse: collapse; /* 1 */
+	border-color: inherit; /* 2 */
+	text-indent: 0; /* 3 */
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Remove default styling (opinion).
+   2. Change the font styles in all browsers.
+   3. Remove the margin in Firefox and Safari.
+   4. Restore natural behaviour for inputs (opinion)
+\*----------------------------------------------------------------------------*/
+
+button,
+input,
+optgroup,
+select,
+textarea {
+	background-color: transparent; /* 1 */
+	border-style: none; /* 1 */
+	font-family: inherit; /* 2 */
+	font-size: inherit; /* 2 */
+	line-height: inherit; /* 2 */
+	margin: 0; /* 3 */
+	word-break: normal; /* 4 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the inheritance in Edge, Firefox.
+\*----------------------------------------------------------------------------*/
+
+button,
+select {
+	text-transform: none;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Add cursor pointer by default (opinion).
+   2. Correct the inability to style clickable types in iOS and Safari.
+\*----------------------------------------------------------------------------*/
+
+button,
+[type='button'],
+[type='reset'],
+[type='submit'] {
+	cursor: pointer; /* 1 */
+	-webkit-appearance: button; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Change the inconsistent appearance in all browsers (opinion).
+   2. Correct the padding in Firefox.
+\*----------------------------------------------------------------------------*/
+
+fieldset {
+	border: 1px solid #c0c0c0; /* 1 */
+	padding: 0.35em 0.75em 0.625em; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the padding so developers are not caught out when they zero out
+   `fieldset` elements in all browsers.
+\*----------------------------------------------------------------------------*/
+
+legend {
+	padding: 0;
+}
+
+/*----------------------------------------------------------------------------*\
+   Add the correct vertical alignment in Chrome, Firefox, and Opera.
+\*----------------------------------------------------------------------------*/
+
+progress {
+	vertical-align: baseline;
+}
+
+/*----------------------------------------------------------------------------*\
+   Change the resize direction on textareas in all browsers (opinion).
+\*----------------------------------------------------------------------------*/
+
+textarea {
+	resize: vertical;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Correct the odd appearance in Chrome and Safari.
+   2. Correct the outline style in Safari
+\*----------------------------------------------------------------------------*/
+
+[type='search'] {
+	-webkit-appearance: textfield; /* 1 */
+	outline-offset: -2px; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Correct the cursor style on increment and decrement buttons in Chrome.
+\*----------------------------------------------------------------------------*/
+
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
+	height: auto;
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the inner padding and cancel buttons in Chrome and Safari for macOS.
+\*----------------------------------------------------------------------------*/
+
+::-webkit-search-decoration {
+	-webkit-appearance: none;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Correct the inability to style clickable types in iOS and Safari.
+   2. Change font properties to `inherit` in Safari.
+\*----------------------------------------------------------------------------*/
+
+::-webkit-file-upload-button {
+	-webkit-appearance: button; /* 1 */
+	font: inherit; /* 2 */
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the inner border and padding in Firefox.
+\*----------------------------------------------------------------------------*/
+
+::-moz-focus-inner {
+	border-style: none;
+	padding: 0;
+}
+
+/*----------------------------------------------------------------------------*\
+   1. Correct the focus styles unset by the previous rule.
+\*----------------------------------------------------------------------------*/
+
+:-moz-focusring {
+	outline: 1px dotted ButtonText;
+}
+
+/*----------------------------------------------------------------------------*\
+   Remove the additional :invalid styles in Firefox.
+\*----------------------------------------------------------------------------*/
+
+:-moz-ui-invalid {
+	box-shadow: none;
+}
+
+/*----------------------------------------------------------------------------*\
+   Add the correct display in all browsers.
+\*----------------------------------------------------------------------------*/
+
+summary {
+	display: list-item;
+}

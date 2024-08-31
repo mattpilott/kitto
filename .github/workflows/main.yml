@@ -1,0 +1,35 @@
+name: Test & Coverage
+
+on: [push, pull_request]
+
+jobs:
+   uvu-tests:
+      runs-on: ubuntu-latest
+      steps:
+         - uses: actions/checkout@4
+         - uses: actions/setup-node@4
+           with:
+              node-version: lts
+
+         - name: Install Bun
+           uses: oven-sh/setup-bun
+           with:
+              bun-version: latest
+
+         - name: Install Dependencies
+           run: bun install
+
+         - name: Lint Code
+           run: bun run lint
+
+         - name: Build
+           run: bun run build
+
+         - name: Tests & Coverage
+           run: bun run test:coverage
+
+         - name: Report Coverage
+           uses: codecov/codecov-action@v4
+           with:
+              token: ${{ secrets.CODECOV_TOKEN }}
+              file: ./coverage/lcov.info
