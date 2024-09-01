@@ -26,7 +26,7 @@ jobs:
            run: bun run build
 
          - name: Tests & Coverage
-           run: bun run test:coverage
+           run: bun run coverage
 
          - name: Report Coverage
            uses: codecov/codecov-action@v4
