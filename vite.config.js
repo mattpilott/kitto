@@ -4,7 +4,10 @@ import { defineConfig } from 'vite'
 export default defineConfig({
 	test: {
 		include: ['lib/**/test.js'],
-		benchmark: { include: ['lib/**/bench.js'] }
+		benchmark: { include: ['lib/**/bench.js'] },
+		coverage: {
+			include: ['lib/**/test.js']
+		}
 	},
 	resolve: {
 		alias: [{ find: '$lib', replacement: resolve(__dirname, './lib') }]
@@ -19,12 +22,5 @@ export default defineConfig({
 			fileName: 'kitto',
 			formats: ['es']
 		}
-		// rollupOptions: {
-		//    output: {
-		//       globals: { 'svelte/store': 'sveltestore' }
-		//    },
-		//    external: ['svelte/store'],
-		//    treeshake: { moduleSideEffects: false }
-		// }
 	}
 })
