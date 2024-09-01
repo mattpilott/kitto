@@ -3,13 +3,13 @@ name: Test & Coverage
 on: [push, pull_request]
 
 jobs:
-   uvu-tests:
+   tests:
       runs-on: ubuntu-latest
       steps:
          - uses: actions/checkout@v4
          - uses: actions/setup-node@v4
            with:
-              node-version: lts
+              node-version: lts/*
 
          - name: Install Bun
            uses: oven-sh/setup-bun@v2
