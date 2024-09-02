@@ -28,7 +28,6 @@ const name = arg.pop()
 const folder = arg.pop()
 
 const capitalize = str => str.charAt(0).toUpperCase() + str.slice(1)
-
 const isValidFolder = folder => validFolders.includes(folder)
 
 const printValidFolders = () => {
@@ -68,6 +67,7 @@ try {
 	})
 
 	let vanillaIndexContent = ''
+
 	try {
 		vanillaIndexContent = fs.readFileSync(vanillaIndex, 'utf8')
 	} catch (err) {
