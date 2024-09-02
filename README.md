@@ -27,4 +27,4 @@ The aim with this approach is to have small files that do one thing well.
 
 #### Open to contributions, ideas and feedback, oh plus bugs of course 🤓
 
-[Documentation available here](https://github.com/mattpilott/kitto/docs)
+[Documentation available here](https://mattpilott.github.io/kitto/)
