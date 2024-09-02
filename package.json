@@ -15,17 +15,16 @@
 	"publishConfig": {
 		"access": "public"
 	},
-	"main": "lib/index.js",
-	"module": "lib/index.js",
+	"main": "lib/vanilla/index.js",
+	"module": "lib/vanilla/index.js",
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
-		".": "./lib/index.js",
+		".": "./lib/vanilla/index.js",
 		"./reset": "./lib/styles/reset.css",
 		"./unify": "./lib/styles/unify.css",
 		"./lightningcss": "./lib/lightningcss/index.js",
 		"./svelte": "./lib/svelte/index.js",
-		"./vanilla": "./lib/vanilla/index.js",
 		"./vite": "./lib/vite/index.js"
 	},
 	"scripts": {
