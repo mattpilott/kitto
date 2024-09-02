@@ -12,3 +12,6 @@ tsconfig.json
 vite.config.js
 */**/test.js
 */**/bench.js
+coverage
+.vscode
+dist

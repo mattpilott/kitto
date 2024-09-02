@@ -18,7 +18,12 @@ export default defineConfig({
 	build: {
 		cssMinify: 'lightningcss',
 		lib: {
-			entry: resolve(__dirname, 'lib/index.js'),
+			entry: {
+				vanilla: 'lib/vanilla/index.js',
+				lightningcss: 'lib/lightningcss/index.js',
+				svelte: 'lib/svelte/index.js',
+				vite: 'lib/vite/index.js'
+			},
 			fileName: 'kitto',
 			formats: ['es']
 		}
