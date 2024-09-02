@@ -1,5 +1,5 @@
 /* Imports */
-import { bench, describe } from 'vitest'
+import { bench } from 'vitest'
 import { yourModuleName } from './index.js'
 
 /* Setup */
