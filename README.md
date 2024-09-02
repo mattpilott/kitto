@@ -1,7 +1,7 @@
 ![Hero](https://raw.githubusercontent.com/mattpilott/kitto/main/.github/hero.svg)
 
 <p align="center">
-  Kitto 🎒, a collection of utilities, helpers and tools for your projects.
+  🎒 Kitto, a collection of utilities, helpers and tools for your projects.
   (Japanese キット for Kit)
 </p>
 
