@@ -19,6 +19,5 @@
 	"markdown": {
 		"hardwrap": false,
 		"idInHeadings": true
-		// This is important for clean-jsdoc-theme, otherwise some features might not work.
 	}
 }
