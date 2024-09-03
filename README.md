@@ -8,7 +8,8 @@
 ## Hello 👋,
 
 <a href="https://github.com/mattpilott/kitto/releases">
-<img src="https://img.shields.io/github/v/release/mattpilott/kitto" alt="Releases" />
+<img src="https://img.shields.io/github/v/release/mattpilott/kitto?include_prereleases
+" alt="Releases" />
 </a>
 
 <a href="https://github.com/mattpilott/kitto/actions">
