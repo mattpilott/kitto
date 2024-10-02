@@ -1,13 +1,12 @@
 /*----------------------------------------------------------------------------*\
-   #REBOOT BROWSER STYLES
+   # UNIFY BROWSER STYLES
 
-   - Version:      1.0.0
-   - Site:         https://github.com/marbyco/kitto
+   - Version:      2.0.0
    – License:      MIT | http://goo.gl/p3bexl
 \*----------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------*\
-   1. Remove repeating backgrounds in all browsers (opinion).
+   1. Remove repeating backgrounds & masks in all browsers (opinion).
    2. Set background position to center apart from to pseudos (opinion).
    3. Set background size to cover in all browsers (opinion).
    4. Add box sizing in all browsers (opinion).
@@ -21,6 +20,7 @@
 	background-position: center; /* 2 */
 	background-size: cover; /* 3 */
 	box-sizing: border-box; /* 4 */
+	mask-repeat: no-repeat; /* 1 */
 	position: relative; /* 5 */
 }
 
