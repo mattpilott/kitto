@@ -4,64 +4,72 @@
  * @module longpress
  * @description Action to longpress on an element
  * @memberof Svelte
- * @version 1.0.0
+ * @version 1.1.0
  * @param {object} node The node to listen to
  * @param {number} duration Duration of the longpress
+ * @param {boolean} persist Whether to persist the longpress event even if the mouse leaves the element
  * @example &lt;button use:longpress={1000} on:longpress={() => alert("longpress")}>
+ * @example &lt;button use:longpress={[1000, true]} on:longpress={() => alert("longpress")}>
  */
-export function longpress(node, duration = 500) {
+export function longpress(node, params) {
+	let duration = 500
+	let persist = false
+
+	if (Array.isArray(params)) {
+		;[duration, persist] = params
+	} else if (typeof params === 'number') {
+		duration = params
+	}
 	let timer
 	let isPressed = false
 
-	function mouseDown(event) {
-		// Ensure it's a left click (primary button)
-		if (event.button !== 0) return
+	function start(event) {
+		// Prevent unwanted context menu
+		if (event.type === 'mousedown' &amp;&amp; event.button !== 0) return
 
 		isPressed = true
+		event.preventDefault() // Prevent touch-based click events
+
+		// Use `setTimeout` to detect longpress
 		timer = window.setTimeout(() => {
 			if (isPressed) {
 				node.dispatchEvent(
 					new CustomEvent('longpress', {
-						detail: { x: event.clientX, y: event.clientY }
+						detail: {
+							x: event.touches ? event.touches[0].clientX : event.clientX,
+							y: event.touches ? event.touches[0].clientY : event.clientY
+						}
 					})
 				)
 			}
 		}, duration)
 	}
 
-	function mouseUp() {
+	function cancel() {
 		isPressed = false
 		clearTimeout(timer)
 	}
 
-	// Handle edge cases where mouse leaves the element
-	function mouseLeave() {
-		isPressed = false
-		clearTimeout(timer)
-	}
-
-	node.addEventListener('mousedown', mouseDown)
-	node.addEventListener('mouseup', mouseUp)
-	node.addEventListener('mouseleave', mouseLeave)
+	node.addEventListener('mousedown', start)
+	node.addEventListener('mouseup', cancel)
+	persist || node.addEventListener('mouseleave', cancel)
 
 	// Add touch support
-	node.addEventListener('touchstart', mouseDown)
-	node.addEventListener('touchend', mouseUp)
-	node.addEventListener('touchcancel', mouseLeave)
+	node.addEventListener('touchstart', start)
+	node.addEventListener('touchend', cancel)
+	persist || node.addEventListener('touchcancel', cancel)
 
 	return {
-		update(newDuration) {
-			mouseUp()
-			duration = newDuration
-		},
 		destroy() {
-			mouseUp()
-			node.removeEventListener('mousedown', mouseDown)
-			node.removeEventListener('mouseup', mouseUp)
-			node.removeEventListener('mouseleave', mouseLeave)
-			node.removeEventListener('touchstart', mouseDown)
-			node.removeEventListener('touchend', mouseUp)
-			node.removeEventListener('touchcancel', mouseLeave)
+			cancel()
+
+			node.removeEventListener('mousedown', start)
+			node.removeEventListener('mouseup', cancel)
+			persist || node.removeEventListener('mouseleave', cancel)
+
+			node.removeEventListener('touchstart', start)
+			node.removeEventListener('touchend', cancel)
+			persist || node.removeEventListener('touchcancel', cancel)
 		}
 	}
 }
