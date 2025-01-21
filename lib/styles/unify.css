@@ -1,7 +1,7 @@
 /*----------------------------------------------------------------------------*\
    # UNIFY BROWSER STYLES
 
-   - Version:      2.0.0
+   - Version:      2.1.0
    – License:      MIT | http://goo.gl/p3bexl
 \*----------------------------------------------------------------------------*/
 
@@ -249,16 +249,20 @@ select {
 }
 
 /*----------------------------------------------------------------------------*\
-   1. Add cursor pointer by default (opinion).
-   2. Correct the inability to style clickable types in iOS and Safari.
+	1. Correct the inability to style clickable types in iOS and Safari.
+	2. Inherit color from parent (opinion).
+   3. Add cursor pointer by default (opinion).
+	4. Remove padding in all browsers (opinion).
 \*----------------------------------------------------------------------------*/
 
 button,
 [type='button'],
 [type='reset'],
 [type='submit'] {
-	cursor: pointer; /* 1 */
-	-webkit-appearance: button; /* 2 */
+	-webkit-appearance: button; /* 1 */
+	color: inherit; /* 2 */
+	cursor: pointer; /* 3 */
+	padding: initial; /* 4 */
 }
 
 /*----------------------------------------------------------------------------*\
