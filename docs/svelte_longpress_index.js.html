@@ -4,7 +4,7 @@
  * @module longpress
  * @description Action to longpress on an element
  * @memberof Svelte
- * @version 1.1.0
+ * @version 1.1.1
  * @param {object} node The node to listen to
  * @param {number} duration Duration of the longpress
  * @param {boolean} persist Whether to persist the longpress event even if the mouse leaves the element
@@ -28,7 +28,6 @@ export function longpress(node, params) {
 		if (event.type === 'mousedown' &amp;&amp; event.button !== 0) return
 
 		isPressed = true
-		event.preventDefault() // Prevent touch-based click events
 
 		// Use `setTimeout` to detect longpress
 		timer = window.setTimeout(() => {
@@ -52,12 +51,12 @@ export function longpress(node, params) {
 
 	node.addEventListener('mousedown', start)
 	node.addEventListener('mouseup', cancel)
-	persist || node.addEventListener('mouseleave', cancel)
+	persist &amp;&amp; node.addEventListener('mouseleave', cancel)
 
 	// Add touch support
 	node.addEventListener('touchstart', start)
 	node.addEventListener('touchend', cancel)
-	persist || node.addEventListener('touchcancel', cancel)
+	persist &amp;&amp; node.addEventListener('touchcancel', cancel)
 
 	return {
 		destroy() {
@@ -65,11 +64,11 @@ export function longpress(node, params) {
 
 			node.removeEventListener('mousedown', start)
 			node.removeEventListener('mouseup', cancel)
-			persist || node.removeEventListener('mouseleave', cancel)
+			persist &amp;&amp; node.removeEventListener('mouseleave', cancel)
 
 			node.removeEventListener('touchstart', start)
 			node.removeEventListener('touchend', cancel)
-			persist || node.removeEventListener('touchcancel', cancel)
+			persist &amp;&amp; node.removeEventListener('touchcancel', cancel)
 		}
 	}
 }
