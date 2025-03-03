@@ -51,12 +51,12 @@ export function longpress(node, params) {
 
 	node.addEventListener('mousedown', start)
 	node.addEventListener('mouseup', cancel)
-	persist &amp;&amp; node.addEventListener('mouseleave', cancel)
+	// persist &amp;&amp; node.addEventListener('mouseleave', cancel)
 
 	// Add touch support
 	node.addEventListener('touchstart', start)
 	node.addEventListener('touchend', cancel)
-	persist &amp;&amp; node.addEventListener('touchcancel', cancel)
+	// persist &amp;&amp; node.addEventListener('touchcancel', cancel)
 
 	return {
 		destroy() {
@@ -64,11 +64,11 @@ export function longpress(node, params) {
 
 			node.removeEventListener('mousedown', start)
 			node.removeEventListener('mouseup', cancel)
-			persist &amp;&amp; node.removeEventListener('mouseleave', cancel)
+			// persist &amp;&amp; node.removeEventListener('mouseleave', cancel)
 
 			node.removeEventListener('touchstart', start)
 			node.removeEventListener('touchend', cancel)
-			persist &amp;&amp; node.removeEventListener('touchcancel', cancel)
+			// persist &amp;&amp; node.removeEventListener('touchcancel', cancel)
 		}
 	}
 }
