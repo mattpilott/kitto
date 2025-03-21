@@ -1,6 +1,6 @@
 {
 	"name": "kitto",
-	"version": "1.0.0-beta.31",
+	"version": "1.0.0-beta.32",
 	"license": "MIT",
 	"description": "A unique blend of tree-shakeable items for any web expedition",
 	"author": "Matt Pilott",
@@ -51,7 +51,7 @@
 		"eslint": "^9.23.0",
 		"eslint-config-prettier": "^10.1.1",
 		"global-jsdom": "^26.0.0",
-		"kitto": "^1.0.0-beta.30",
+		"kitto": "^1.0.0-beta.31",
 		"lightningcss": "^1.29.3",
 		"prettier": "^3.5.3",
 		"replace-in-file": "^8.3.0",
