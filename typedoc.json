@@ -1,0 +1,14 @@
+{
+	"$schema": "https://typedoc.org/schema.json",
+	"entryPoints": ["src/lib/**/*.ts"],
+	"out": "docs",
+	"tsconfig": "tsconfig.json",
+	"includeVersion": true,
+	"excludePrivate": true,
+	"excludeInternal": true,
+	"excludeProtected": true,
+	"theme": "typedoc-github-theme",
+	"plugin": ["typedoc-github-theme"],
+	"name": "Kitto",
+	"readme": "readme.md"
+}

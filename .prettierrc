@@ -5,5 +5,14 @@
 	"printWidth": 115,
 	"tabWidth": 3,
 	"arrowParens": "avoid",
-	"semi": false
+	"semi": false,
+	"plugins": ["prettier-plugin-svelte"],
+	"overrides": [
+		{
+			"files": "*.svelte",
+			"options": {
+				"parser": "svelte"
+			}
+		}
+	]
 }
