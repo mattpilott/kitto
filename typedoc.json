@@ -10,5 +10,5 @@
 	"theme": "typedoc-github-theme",
 	"plugin": ["typedoc-github-theme"],
 	"name": "Kitto",
-	"readme": "readme.md"
+	"readme": "README.md"
 }
