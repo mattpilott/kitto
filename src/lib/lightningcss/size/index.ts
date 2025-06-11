@@ -38,27 +38,22 @@ export const size = {
 	Declaration: {
 		custom: {
 			size({ value }: { value: Array<Value> }) {
-				function parse_value(token_or_value?: Value) {
+				function parse_value(token_or_value: Value) {
 					if (!token_or_value) return
 					const { type, value } = token_or_value
 					const obj = { type: 'length-percentage' } as const
 
-					if (type === 'length' && 'unit' in token_or_value) {
+					if (type === 'length') {
 						return {
 							...obj,
-							value: {
-								type: 'dimension',
-								value,
-								unit: token_or_value.unit as LengthUnit
-							}
+							value: { type: 'dimension', value, unit: token_or_value.unit as LengthUnit }
 						} as const
-					} else if (type === 'token' && 'value' in value) {
+					}
+
+					if (type === 'token') {
 						return {
 							...obj,
-							value: {
-								type: 'percentage',
-								value: Number(value.value)
-							}
+							value: { type: 'percentage', value: value.value }
 						} as const
 					}
 
