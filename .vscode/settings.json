@@ -1,0 +1,21 @@
+{
+	"files.exclude": {
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.hg": true,
+		"**/CVS": true,
+		"**/.DS_Store": true,
+		"**/Thumbs.db": true,
+		".npmrc": true,
+		"**/global.d.ts": true,
+		"**/.nova": true,
+		"**/node_modules": true,
+		"**/pnpm-lock.yaml": true,
+		".vscode": true,
+		"**/build": true,
+		"**/functions": true,
+		".gitignore": true,
+		"**/.svelte-kit": true
+	},
+	"explorerExclude.backup": {}
+}
