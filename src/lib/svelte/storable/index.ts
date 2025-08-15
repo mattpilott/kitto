@@ -35,7 +35,7 @@ export function storable<T>(
 
 	const store = writable(stored_data)
 	const { subscribe, set } = store
-	const initial = data
+	const initial = structuredClone(data)
 
 	window.addEventListener('storage', event => {
 		if (event.key === name && event.storageArea === storage) {
