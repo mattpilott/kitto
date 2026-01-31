@@ -1,86 +1,123 @@
+const THRESHOLD = 10 // pixels
+
 /**
  * @module longpress
  * @group Svelte
- * @version 1.1.3
- * @remarks Action to longpress on an element
+ * @version 1.2.0
+ * @remarks Action to longpress on an element. Fires only when the pointer has been
+ * held for `duration` ms and is still over the element (avoids opening on tap / when
+ * pointer has moved off, e.g. iOS with keyboard). Dispatches `longpressrevoke` when
+ * the end event shows the press was short so consumers can close UI.
  *
  * @param node - The node to listen to
- * @param duration - Duration of the longpress in milliseconds
- * @example <button use:longpress={1000} on:longpress={() => alert("longpress")}>
+ * @param duration - Hold duration in milliseconds (default 800)
+ * @example <button use:longpress={800} on:longpress={open} on:longpressrevoke={close}>
  */
-export function longpress(node: HTMLElement, duration: number = 500): { destroy: () => void } {
-	let timer: ReturnType<typeof window.setTimeout> | number
-	let is_pressed = false
-	let start_y = 0
+export function longpress(
+	node: HTMLElement,
+	duration: number = 800
+): { destroy: () => void } {
+	let timer: ReturnType<typeof window.setTimeout> | undefined
+	let did_dispatch = false
+	let start_timestamp = 0
 	let start_x = 0
+	let start_y = 0
+	let last_x = 0
+	let last_y = 0
 
-	const threshold = 10 // pixels
+	function get_coords(event: MouseEvent | TouchEvent): { x: number; y: number } {
+		if ('touches' in event && event.touches.length) {
+			return { x: event.touches[0].clientX, y: event.touches[0].clientY }
+		}
+		return { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY }
+	}
+
+	function is_inside_node(x: number, y: number): boolean {
+		const rect = node.getBoundingClientRect()
+		return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+	}
+
+	function clear_timer() {
+		if (timer !== undefined) {
+			clearTimeout(timer)
+			timer = undefined
+		}
+	}
 
 	function start(event: MouseEvent | TouchEvent) {
-		// Prevent unwanted context menu
 		if (event.type === 'mousedown' && 'button' in event && event.button !== 0) return
 
-		is_pressed = true
-		if ('touches' in event) {
-			start_y = event.touches[0].clientY
-			start_x = event.touches[0].clientX
-		} else {
-			start_y = event.clientY
-			start_x = event.clientX
-		}
+		clear_timer()
+		did_dispatch = false
+		start_timestamp = event.timeStamp
+		const coords = get_coords(event)
+		start_x = last_x = coords.x
+		start_y = last_y = coords.y
 
-		// Use `setTimeout` to detect longpress
 		timer = window.setTimeout(() => {
-			if (!is_pressed) return
-
-			node.dispatchEvent(
-				new CustomEvent('longpress', {
-					detail: {
-						x: 'touches' in event ? event.touches[0].clientX : event.clientX,
-						y: 'touches' in event ? event.touches[0].clientY : event.clientY
-					}
-				})
-			)
+			timer = undefined
+			if (is_inside_node(last_x, last_y)) {
+				did_dispatch = true
+				node.dispatchEvent(
+					new CustomEvent('longpress', {
+						detail: { x: last_x, y: last_y }
+					})
+				)
+			}
 		}, duration)
 	}
 
 	function cancel() {
-		is_pressed = false
-		clearTimeout(timer)
+		clear_timer()
 	}
 
 	function move(event: MouseEvent | TouchEvent) {
-		if (!is_pressed) return
+		if (timer === undefined) return
 
-		const current_y = 'touches' in event ? event.touches[0].clientY : event.clientY
-		const current_x = 'touches' in event ? event.touches[0].clientX : event.clientX
-		const delta_y = Math.abs(current_y - start_y)
-		const delta_x = Math.abs(current_x - start_x)
+		const coords = get_coords(event)
+		last_x = coords.x
+		last_y = coords.y
 
-		// Cancel if moved more than threshold in any direction
-		if (delta_y > threshold || delta_x > threshold) cancel()
+		if (
+			Math.abs(coords.x - start_x) > THRESHOLD ||
+			Math.abs(coords.y - start_y) > THRESHOLD ||
+			!is_inside_node(coords.x, coords.y)
+		) {
+			cancel()
+		}
 	}
 
-	node.addEventListener('mousedown', start)
-	node.addEventListener('mouseup', cancel)
-	node.addEventListener('mousemove', move)
+	function end(event: MouseEvent | TouchEvent) {
+		if (!did_dispatch) {
+			clear_timer()
+			return
+		}
+		const elapsed = event.timeStamp - start_timestamp
+		// Only revoke when the press was short. Don't revoke for "left target" –
+		// when the keyboard closes the layout shifts so the release position can
+		// appear outside the moved element and wrongly close the menu.
+		if (elapsed < duration) {
+			node.dispatchEvent(new CustomEvent('longpressrevoke'))
+		}
+		clear_timer()
+	}
 
-	// Add touch support
-	node.addEventListener('touchstart', start)
-	node.addEventListener('touchend', cancel)
-	node.addEventListener('touchmove', move)
+	node.addEventListener('touchstart', start, { passive: true })
+	node.addEventListener('touchmove', move, { passive: true })
+	node.addEventListener('touchend', end)
+	node.addEventListener('mousedown', start)
+	node.addEventListener('mousemove', move)
+	node.addEventListener('mouseup', end)
 
 	return {
 		destroy() {
-			cancel()
-
-			node.removeEventListener('mousedown', start)
-			node.removeEventListener('mouseup', cancel)
-			node.removeEventListener('mousemove', move)
-
+			clear_timer()
 			node.removeEventListener('touchstart', start)
-			node.removeEventListener('touchend', cancel)
 			node.removeEventListener('touchmove', move)
+			node.removeEventListener('touchend', end)
+			node.removeEventListener('mousedown', start)
+			node.removeEventListener('mousemove', move)
+			node.removeEventListener('mouseup', end)
 		}
 	}
 }
