@@ -3,11 +3,13 @@ const THRESHOLD = 10 // pixels
 /**
  * @module longpress
  * @group Svelte
- * @version 1.2.0
- * @remarks Action to longpress on an element. Fires only when the pointer has been
- * held for `duration` ms and is still over the element (avoids opening on tap / when
- * pointer has moved off, e.g. iOS with keyboard). Dispatches `longpressrevoke` when
- * the end event shows the press was short so consumers can close UI.
+ * @version 1.3.0
+ * @remarks Action to longpress on an element. Fires when the pointer has been held
+ * for `duration` ms without moving beyond the threshold. Dispatches `longpressrevoke`
+ * when the end event shows the press was short so consumers can close UI. Restarts
+ * the hold timer on visual viewport resize (e.g. keyboard open/close) to avoid false
+ * triggers. Ignores synthesized mouse events after touch interactions to prevent
+ * double-firing on iOS.
  *
  * @param node - The node to listen to
  * @param duration - Hold duration in milliseconds (default 800)
@@ -21,6 +23,7 @@ export function longpress(node: HTMLElement, duration: number = 800): { destroy:
 	let start_y = 0
 	let last_x = 0
 	let last_y = 0
+	let had_touch = false
 
 	function get_coords(event: MouseEvent | TouchEvent): { x: number; y: number } {
 		if ('touches' in event && event.touches.length) {
@@ -36,29 +39,59 @@ export function longpress(node: HTMLElement, duration: number = 800): { destroy:
 		}
 	}
 
+	function fire() {
+		timer = undefined
+		did_dispatch = true
+		node.dispatchEvent(
+			new CustomEvent('longpress', {
+				detail: { x: last_x, y: last_y }
+			})
+		)
+	}
+
+	function arm() {
+		clear_timer()
+		timer = window.setTimeout(fire, duration)
+	}
+
+	function on_viewport_resize() {
+		if (timer !== undefined) {
+			arm()
+		}
+	}
+
+	function add_viewport_listener() {
+		window.visualViewport?.addEventListener('resize', on_viewport_resize)
+	}
+
+	function remove_viewport_listener() {
+		window.visualViewport?.removeEventListener('resize', on_viewport_resize)
+	}
+
 	function start(event: MouseEvent | TouchEvent) {
+		if ('touches' in event) {
+			had_touch = true
+		} else if (had_touch) {
+			return
+		}
 		if (event.type === 'mousedown' && 'button' in event && event.button !== 0) return
 
-		clear_timer()
 		did_dispatch = false
 		start_timestamp = event.timeStamp
 		const coords = get_coords(event)
 		start_x = last_x = coords.x
 		start_y = last_y = coords.y
 
-		timer = window.setTimeout(() => {
-			timer = undefined
-			did_dispatch = true
-			node.dispatchEvent(
-				new CustomEvent('longpress', {
-					detail: { x: last_x, y: last_y }
-				})
-			)
-		}, duration)
+		arm()
+		add_viewport_listener()
 	}
 
 	function cancel() {
 		clear_timer()
+		remove_viewport_listener()
+		setTimeout(() => {
+			had_touch = false
+		}, 1000)
 	}
 
 	function move(event: MouseEvent | TouchEvent) {
@@ -74,14 +107,15 @@ export function longpress(node: HTMLElement, duration: number = 800): { destroy:
 	}
 
 	function end(event: MouseEvent | TouchEvent) {
+		if (event.type === 'mouseup' && had_touch) return
+		remove_viewport_listener()
+
 		if (!did_dispatch) {
 			clear_timer()
 			return
 		}
+
 		const elapsed = event.timeStamp - start_timestamp
-		// Only revoke when the press was short. Don't revoke for "left target" –
-		// when the keyboard closes the layout shifts so the release position can
-		// appear outside the moved element and wrongly close the menu.
 		if (elapsed < duration) {
 			node.dispatchEvent(new CustomEvent('longpressrevoke'))
 		}
@@ -99,6 +133,7 @@ export function longpress(node: HTMLElement, duration: number = 800): { destroy:
 	return {
 		destroy() {
 			clear_timer()
+			remove_viewport_listener()
 			node.removeEventListener('touchstart', start)
 			node.removeEventListener('touchmove', move)
 			node.removeEventListener('touchend', end)
