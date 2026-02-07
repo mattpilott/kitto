@@ -13,10 +13,7 @@ const THRESHOLD = 10 // pixels
  * @param duration - Hold duration in milliseconds (default 800)
  * @example <button use:longpress={800} on:longpress={open} on:longpressrevoke={close}>
  */
-export function longpress(
-	node: HTMLElement,
-	duration: number = 800
-): { destroy: () => void } {
+export function longpress(node: HTMLElement, duration: number = 800): { destroy: () => void } {
 	let timer: ReturnType<typeof window.setTimeout> | undefined
 	let did_dispatch = false
 	let start_timestamp = 0
@@ -30,11 +27,6 @@ export function longpress(
 			return { x: event.touches[0].clientX, y: event.touches[0].clientY }
 		}
 		return { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY }
-	}
-
-	function is_inside_node(x: number, y: number): boolean {
-		const rect = node.getBoundingClientRect()
-		return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 	}
 
 	function clear_timer() {
@@ -56,14 +48,12 @@ export function longpress(
 
 		timer = window.setTimeout(() => {
 			timer = undefined
-			if (is_inside_node(last_x, last_y)) {
-				did_dispatch = true
-				node.dispatchEvent(
-					new CustomEvent('longpress', {
-						detail: { x: last_x, y: last_y }
-					})
-				)
-			}
+			did_dispatch = true
+			node.dispatchEvent(
+				new CustomEvent('longpress', {
+					detail: { x: last_x, y: last_y }
+				})
+			)
 		}, duration)
 	}
 
@@ -78,11 +68,7 @@ export function longpress(
 		last_x = coords.x
 		last_y = coords.y
 
-		if (
-			Math.abs(coords.x - start_x) > THRESHOLD ||
-			Math.abs(coords.y - start_y) > THRESHOLD ||
-			!is_inside_node(coords.x, coords.y)
-		) {
+		if (Math.abs(coords.x - start_x) > THRESHOLD || Math.abs(coords.y - start_y) > THRESHOLD) {
 			cancel()
 		}
 	}
@@ -105,6 +91,7 @@ export function longpress(
 	node.addEventListener('touchstart', start, { passive: true })
 	node.addEventListener('touchmove', move, { passive: true })
 	node.addEventListener('touchend', end)
+	node.addEventListener('touchcancel', cancel)
 	node.addEventListener('mousedown', start)
 	node.addEventListener('mousemove', move)
 	node.addEventListener('mouseup', end)
@@ -115,6 +102,7 @@ export function longpress(
 			node.removeEventListener('touchstart', start)
 			node.removeEventListener('touchmove', move)
 			node.removeEventListener('touchend', end)
+			node.removeEventListener('touchcancel', cancel)
 			node.removeEventListener('mousedown', start)
 			node.removeEventListener('mousemove', move)
 			node.removeEventListener('mouseup', end)
