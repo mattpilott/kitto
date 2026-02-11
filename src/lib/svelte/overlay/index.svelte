@@ -114,12 +114,27 @@
 	function keyup({ code }: { code: string }) {
 		array_keys.delete(code)
 	}
+
+	function portal(node: HTMLElement) {
+		const target =
+			typeof document !== 'undefined' ? document.querySelector('body > div') ?? document.body : null
+		if (target) target.prepend(node)
+		return {
+			destroy() {
+				node.remove()
+			}
+		}
+	}
 </script>
 
 <svelte:window onkeydown={keydown} onkeyup={keyup} bind:innerHeight bind:innerWidth />
 
 {#if hasOverlay && $overlay.opacity !== '0'}
-	<picture class="overlay" style="--mobile:{msize}px; --desktop:{dsize}px">
+	<picture
+		class="overlay"
+		style="--mobile:{msize}px; --desktop:{dsize}px"
+		use:portal
+	>
 		<source srcset={dsrc || msrc} media="(min-width: 640px)" />
 		<img
 			class="img"
