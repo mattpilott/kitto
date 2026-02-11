@@ -1,27 +1,52 @@
 <script lang="ts">
-	// This component allows a design to be overlaid on the page
-	// This helps you to achieve a pixel perfect design implementation
-	// It accepts 2 params for setting the desktop and mobile image paths
-	// There are desktop and mobile css variables that can be used to set the design width
-	// The --desktop and --mobile vars default to 1920 and 393 respectively
-	// To show/hide the overlay press 1 - 9 on the keyboard. 0 = 100%, 00 = 0% opacity
-	// You can shift the overlay up or down too; hold shift and press the left or right arrows
-	// Additiionally for a smaller shift up or down hold ctrl alongside shift
-	// Finally you can reset the overlay shift with shift + both the left & right arrows
-
+	/**
+	 * Overlay – design overlay for pixel-perfect implementation.
+	 *
+	 * **Props:** Pass at least one of `mobile` or `desktop` with the image path. You can append
+	 * an optional design width in pixels using `@`, e.g. `"/mobile.jpg@393"` or `"/desktop.jpg@1920"`.
+	 * The width sets the overlay’s intrinsic size (defaults: mobile 393px, desktop 1920px).
+	 *
+	 * **Keyboard:** 1–9 = opacity 10–90%; 0 = 100%, 00 = 0%. Shift + ↑/↓ = shift overlay;
+	 * add Ctrl for finer steps. Shift + ↑ and ↓ together = reset shift.
+	 */
 	import { storable } from '../storable/index.js'
 
+	/**
+	 * Overlay props. Provide at least one of `mobile` or `desktop`.
+	 */
 	interface Props {
+		/**
+		 * Image path for the mobile overlay (used below 640px). Optional design width in px
+		 * can be appended with `@`, e.g. `"/mobile.jpg@393"`. Default width is 393.
+		 */
 		mobile?: string
+		/**
+		 * Image path for the desktop overlay (640px and up). Optional design width in px
+		 * can be appended with `@`, e.g. `"/desktop.jpg@1920"`. Default width is 1920.
+		 */
 		desktop?: string
 	}
 
-	let { mobile = '/mobile.jpg', desktop = '/desktop.jpg' }: Props = $props()
+	let { mobile, desktop }: Props = $props()
 
-	const msrc: string = mobile.split('@')[0]
-	const dsrc: string = desktop.split('@')[0]
-	const msize: string = mobile.split('@')[1] || '393'
-	const dsize: string = desktop.split('@')[1] || '1920'
+	// Use whichever is provided; if only one is passed, use it for both breakpoints
+	const effectiveMobile = $derived(mobile ?? desktop)
+	const effectiveDesktop = $derived(desktop ?? mobile)
+	const hasOverlay = $derived(effectiveMobile != null || effectiveDesktop != null)
+
+	const msrc = $derived(effectiveMobile?.split('@')[0] ?? '')
+	const dsrc = $derived(effectiveDesktop?.split('@')[0] ?? '')
+	const msize = $derived(effectiveMobile?.split('@')[1] ?? '393')
+	const dsize = $derived(effectiveDesktop?.split('@')[1] ?? '1920')
+
+	$effect(() => {
+		if (!hasOverlay) {
+			console.warn(
+				'[Overlay] No overlay image provided. Pass a `mobile` and/or `desktop` prop with the image path(s), e.g. <Overlay mobile="/mobile.jpg" desktop="/desktop.jpg" />'
+			)
+		}
+	})
+
 	const overlay = storable({ opacity: '0.0', shift: '0px' }, 'overlay')
 
 	let innerWidth: number = $state(0)
@@ -39,12 +64,14 @@
 		code,
 		shiftKey,
 		ctrlKey,
-		altKey
+		altKey,
+		metaKey
 	}: {
 		code: string
 		shiftKey: boolean
 		ctrlKey: boolean
 		altKey: boolean
+		metaKey: boolean
 	}) {
 		const now: number = Date.now()
 
@@ -91,7 +118,7 @@
 
 <svelte:window onkeydown={keydown} onkeyup={keyup} bind:innerHeight bind:innerWidth />
 
-{#if desktop && $overlay.opacity !== '0'}
+{#if hasOverlay && $overlay.opacity !== '0'}
 	<picture class="overlay" style="--mobile:{msize}px; --desktop:{dsize}px">
 		<source srcset={dsrc || msrc} media="(min-width: 640px)" />
 		<img
