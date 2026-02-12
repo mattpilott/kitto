@@ -9,6 +9,7 @@
 	 * **Keyboard:** 1–9 = opacity 10–90%; 0 = 100%, 00 = 0%. Shift + ↑/↓ = shift overlay;
 	 * add Ctrl for finer steps. Shift + ↑ and ↓ together = reset shift.
 	 */
+	import { SvelteSet } from 'svelte/reactivity'
 	import { storable } from '../storable/index.js'
 
 	/**
@@ -58,7 +59,7 @@
 
 	let last_key_pressed: string | null = null
 	let last_key_press_time: number = 0
-	let array_keys: Set<string> = new Set()
+	let array_keys = new SvelteSet<string>()
 
 	function keydown({
 		code,
@@ -117,7 +118,7 @@
 
 	function portal(node: HTMLElement) {
 		const target =
-			typeof document !== 'undefined' ? document.querySelector('body > div') ?? document.body : null
+			typeof document !== 'undefined' ? (document.querySelector('body > div') ?? document.body) : null
 		if (target) target.prepend(node)
 		return {
 			destroy() {
@@ -130,11 +131,7 @@
 <svelte:window onkeydown={keydown} onkeyup={keyup} bind:innerHeight bind:innerWidth />
 
 {#if hasOverlay && $overlay.opacity !== '0'}
-	<picture
-		class="overlay"
-		style="--mobile:{msize}px; --desktop:{dsize}px"
-		use:portal
-	>
+	<picture class="overlay" style="--mobile:{msize}px; --desktop:{dsize}px" use:portal>
 		<source srcset={dsrc || msrc} media="(min-width: 640px)" />
 		<img
 			class="img"

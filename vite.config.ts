@@ -18,7 +18,7 @@ export default defineConfig({
 			]
 		},
 		benchmark: { include: ['src/**/bench.{js,ts}'] },
-		workspace: [
+		projects: [
 			{
 				extends: './vite.config.ts',
 				plugins: [svelteTesting()],

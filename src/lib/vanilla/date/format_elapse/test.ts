@@ -42,10 +42,12 @@ describe('format_elapse', () => {
 	})
 
 	it('should return "Today at hh:mm" if the date is today', () => {
-		const now = new Date()
-		const date = new Date(now.getTime() - 2 * 60 * 60 * 1000) // 2 hours ago
+		vi.useFakeTimers()
+		vi.setSystemTime(new Date('2024-06-15T14:00:00')) // fixed "now" so test is not sensitive to midnight
+		const date = new Date('2024-06-15T12:00:00') // 2 hours earlier, same calendar day
 		const result = format_elapse(date)
 		expect(result).toBe(`Today at ${date.getHours()}:${date.getMinutes()}`)
+		vi.useRealTimers()
 	})
 
 	it('should return "Yesterday at hh:mm" if the date is yesterday', () => {

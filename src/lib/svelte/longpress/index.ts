@@ -16,7 +16,7 @@ const THRESHOLD = 10 // pixels
  * @example <button use:longpress={800} on:longpress={open} on:longpressrevoke={close}>
  */
 export function longpress(node: HTMLElement, duration: number = 800): { destroy: () => void } {
-	let timer: ReturnType<typeof window.setTimeout> | undefined
+	let timer: number | undefined
 	let did_dispatch = false
 	let start_timestamp = 0
 	let start_x = 0
