@@ -7,11 +7,11 @@ function is_length(value: unknown) {
 /**
  * @module fluid
  * @group LightningCSS
- * @version 1.0.0
+ * @version 2.0.0
  * @remarks Generates a fluid typography scale based on the provided min and max viewport and font sizes.
  *
  * @param [params={}] - The parameters object.
- * @param [params.vmin=0] - The minimum viewport width.
+ * @param [params.vmin=320] - The minimum viewport width.
  * @param [params.vmax=1600] - The maximum viewport width.
  * @param [params.root=16] - The root font size in pixels.
  *
@@ -19,13 +19,13 @@ function is_length(value: unknown) {
  * ```ts
  * import { fluid } from 'lightningcss'
  *
- * const fluid = fluid({ vmin: 0, vmax: 1600, root: 16 })
+ * const fluid = fluid({ vmin: 320, vmax: 1600, root: 16 })
  * ```
  *
  * @returns An object containing the `fluid` function.
  */
 
-export const fluid = ({ vmin = 0, vmax = 1600, root = 16 } = {}) =>
+export const fluid = ({ vmin = 320, vmax = 1600, root = 16 } = {}) =>
 	({
 		Function: {
 			fluid({ arguments: [{ value: min_y }, , { value: max_y }] }) {
