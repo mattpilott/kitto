@@ -1,9 +1,9 @@
-import type { CustomAtRules, Visitor } from 'lightningcss'
+import type { CustomAtRules, MediaQuery, Visitor } from 'lightningcss'
 
 /**
  * @module breakpoints
  * @group LightningCSS
- * @version 1.0.0
+ * @version 2.0.0
  * @remarks Generates a media query handler for custom breakpoints.
  *
  * @param breakpoints - An object containing breakpoint values.
@@ -12,43 +12,42 @@ import type { CustomAtRules, Visitor } from 'lightningcss'
 
 export const breakpoints = (breakpoints: Record<string, number>) =>
 	({
-		Rule: {
-			media(media) {
-				const [mq] = media.value.query.mediaQueries
-				const operator = mq.condition && 'operator' in mq.condition ? mq.condition.operator : 'and'
-				const conditions = mq.condition && 'conditions' in mq.condition ? mq.condition.conditions : []
-				const value = mq.condition && 'value' in mq.condition ? mq.condition.value : undefined
+		MediaQuery(query: MediaQuery) {
+			const operator = query.condition && 'operator' in query.condition ? query.condition.operator : 'and'
+			const conditions = query.condition && 'conditions' in query.condition ? query.condition.conditions : []
+			const value = query.condition && 'value' in query.condition ? query.condition.value : undefined
 
-				const conds = value ? [{ value }] : (conditions ?? [])
-				const queries: Array<string> = []
+			const conds = value ? [{ value }] : (conditions ?? [])
+			const queries: Array<string> = []
 
-				for (const item of conds) {
-					if (!('value' in item)) return media
-					if (!('name' in item.value)) return media
-					if (!item.value.name.startsWith('--')) return media
+			for (const item of conds) {
+				if (!('value' in item)) return query
+				if (!('name' in item.value)) return query
+				if (!item.value.name.startsWith('--')) return query
 
-					const name = item.value.name.replace('--', '').split('-').pop()
-					if (!name) return media
+				const name = item.value.name.replace('--', '').split('-').pop()
+				if (!name) return query
 
-					if (!Object.prototype.hasOwnProperty.call(breakpoints, name)) return media
-				}
-
-				conds.forEach(cond => {
-					if (!('value' in cond) || !('name' in cond.value)) return
-					const { name } = cond.value
-					const [till, device] = name.split('--').pop()?.split('-') ?? []
-					if (!till || !device) return
-
-					const minmax = till === 'from' ? 'min' : 'max'
-					const point = breakpoints[device] - ~~(till !== 'from')
-
-					queries.push(`(${minmax}-width: ${point / 16}em)`)
-				})
-				const raw = queries.join(queries.length > 1 ? ` ${operator} ` : '')
-
-				media.value.query = { mediaQueries: [{ raw } as never] }
-
-				return media
+				if (!Object.prototype.hasOwnProperty.call(breakpoints, name)) return query
 			}
+
+			conds.forEach(cond => {
+				if (!('value' in cond) || !('name' in cond.value)) return
+				const { name } = cond.value
+				const [till, device] = name.split('--').pop()?.split('-') ?? []
+				if (!till || !device) return
+
+				const minmax = till === 'from' ? 'min' : 'max'
+				const point = breakpoints[device] - ~~(till !== 'from')
+
+				queries.push(`(${minmax}-width: ${point / 16}em)`)
+			})
+
+			if (!queries.length) return query
+
+			const raw = queries.join(queries.length > 1 ? ` ${operator} ` : '')
+
+			// Use ReturnedMediaQuery's raw-string form so LightningCSS can re-parse it.
+			return { raw }
 		}
 	}) satisfies Visitor<CustomAtRules>
