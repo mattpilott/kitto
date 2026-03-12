@@ -16,6 +16,8 @@
 <style lang="css">
 	h1 {
 		color: red;
+		font: 400 var(--f-h1);
+		size: 100px;
 
 		@media (--from-mobile) {
 			color: green;
