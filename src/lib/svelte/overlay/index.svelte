@@ -143,7 +143,7 @@
 	</picture>
 {/if}
 
-<style>
+<style lang="css">
 	.overlay {
 		display: block;
 		height: auto;
