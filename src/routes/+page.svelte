@@ -11,5 +11,6 @@
 <style lang="css">
 	h1 {
 		color: red;
+		size: 100px;
 	}
 </style>
