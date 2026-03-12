@@ -1,7 +1,7 @@
 import type { CustomAtRules, Visitor } from 'lightningcss'
 
-function is_length(value: unknown) {
-	return typeof value === 'object' && 'unit' in value!
+function is_length(value: unknown): value is { unit: string; value: number } {
+	return typeof value === 'object' && value !== null && 'unit' in value && 'value' in value
 }
 
 /**
@@ -28,10 +28,13 @@ function is_length(value: unknown) {
 export const fluid = ({ vmin = 320, vmax = 1600, root = 16 } = {}) =>
 	({
 		Function: {
-			fluid({ arguments: [{ value: min_y }, , { value: max_y }] }) {
-				const to_px = (value: number, unit: string) => (unit === 'rem' ? value * root : value)
+			fluid(fn) {
+				const length_args = fn.arguments.filter(arg => arg.type === 'length').map(arg => arg.value)
+				const [min_y, max_y] = length_args
 
 				if (!is_length(min_y) || !is_length(max_y)) return
+
+				const to_px = (value: number, unit: string) => (unit === 'rem' ? value * root : value)
 
 				const min_y_in_px = to_px(min_y.value, min_y.unit)
 				const max_y_in_px = to_px(max_y.value, max_y.unit)
