@@ -7,16 +7,14 @@
  * @returns The encoded string or decoded object
  */
 
-function encode(obj: Record<string, unknown> | string, pfx?: string) {
+function encode(obj: Record<string, unknown>, pfx?: string): string {
 	// eslint-disable-next-line no-var
 	var k,
 		i,
 		tmp,
 		str = ''
 
-	// @ts-expect-error - @todo fix this
 	for (k in obj) {
-		// @ts-expect-error - @todo fix this
 		if ((tmp = obj[k]) !== void 0) {
 			if (Array.isArray(tmp)) {
 				for (i = 0; i < tmp.length; i++) {
@@ -65,6 +63,8 @@ function decode(str: string) {
 	return out
 }
 
-export function query(data: Record<string, unknown> | string, pfx?: string) {
-	return data.constructor === Object ? encode(data, pfx) : decode(data as string)
+export function query(data: Record<string, unknown>, pfx?: string): string
+export function query<T extends Record<string, unknown> = Record<string, unknown>>(data: string, pfx?: string): T
+export function query(data: Record<string, unknown> | string, pfx?: string): string | Record<string, unknown> {
+	return data.constructor === Object ? encode(data as Record<string, unknown>, pfx) : decode(data as string)
 }
