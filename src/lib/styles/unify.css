@@ -1,7 +1,7 @@
 /*----------------------------------------------------------------------------*\
    # UNIFY BROWSER STYLES
 
-   - Version:      2.1.0
+   - Version:      2.2.0
    – License:      MIT | http://goo.gl/p3bexl
 \*----------------------------------------------------------------------------*/
 
@@ -63,16 +63,7 @@ html {
 \*----------------------------------------------------------------------------*/
 
 body {
-	font-family:
-		system-ui,
-		-apple-system,
-		'Segoe UI',
-		Roboto,
-		Helvetica,
-		Arial,
-		sans-serif,
-		'Apple Color Emoji',
-		'Segoe UI Emoji'; /* 1 */
+	font-family: system-ui, sans-serif; /* 1 */
 	margin: 0; /* 2 */
 	text-wrap: pretty; /* 3 */
 }
