@@ -7,7 +7,7 @@ function is_length(value: unknown): value is { unit: string; value: number } {
 /**
  * @module fluid
  * @group LightningCSS
- * @version 2.0.0
+ * @version 2.0.1
  * @remarks Generates a fluid typography scale based on the provided min and max viewport and font sizes.
  *
  * @param [params={}] - The parameters object.
@@ -45,7 +45,7 @@ export const fluid = ({ vmin = 320, vmax = 1600, root = 16 } = {}) =>
 				const rem = min_y_in_px / root
 
 				const vmin_factor = vmin / 100
-				const scale_factor = (100 * (max_y_in_px - min_y_in_px)) / (vmax - vmin)
+				const scale_factor = (100 * (max_y_in_px - min_y_in_px)) / ((vmax - 2) - vmin)
 
 				const scalar = `${rem.toFixed(4)}rem + ((1vw - ${vmin_factor.toFixed(1)}px) * ${scale_factor.toFixed(4)})`
 
