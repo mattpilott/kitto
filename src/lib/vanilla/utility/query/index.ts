@@ -23,7 +23,7 @@ function encode(obj: Record<string, unknown>, pfx?: string): string {
 				}
 			} else {
 				if (str) str += '&'
-				str += encodeURIComponent(k) + '=' + encodeURIComponent(tmp)
+				str += encodeURIComponent(k) + '=' + encodeURIComponent(tmp as string)
 			}
 		}
 	}

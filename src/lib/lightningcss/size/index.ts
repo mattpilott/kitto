@@ -1,9 +1,9 @@
-import type { LengthUnit } from 'lightningcss'
+import type { CustomAtRules, CustomProperty, TokenOrValue, Visitor } from 'lightningcss'
 
 /**
  * @module size
  * @group LightningCSS
- * @version 1.0.0
+ * @version 1.0.1
  * @remarks Shorthand for height and width css properties.
  *
  * @param [params={}] - The parameters object.
@@ -19,49 +19,34 @@ import type { LengthUnit } from 'lightningcss'
  * ```
  */
 
-type Value =
-	| {
-			type: 'length'
-			value: number
-			unit: LengthUnit
-	  }
-	| {
-			type: 'token'
-			value: {
-				type: 'percentage'
-				value: number
-			}
-	  }
-	| null
-
 export const size = {
 	Declaration: {
 		custom: {
-			size({ value }: { value: Array<Value> }) {
-				function parse_value(token_or_value: Value) {
+			size({ value }: CustomProperty) {
+				function parse_value(token_or_value: TokenOrValue | undefined) {
 					if (!token_or_value) return
-					const { type, value } = token_or_value
-					const obj = { type: 'length-percentage' } as const
 
-					if (type === 'length') {
+					if (token_or_value.type === 'length') {
 						return {
-							...obj,
-							value: { type: 'dimension', value, unit: token_or_value.unit as LengthUnit }
+							type: 'length-percentage',
+							value: { type: 'dimension', value: token_or_value.value }
 						} as const
 					}
 
-					if (type === 'token') {
+					if (token_or_value.type === 'token' && token_or_value.value.type === 'percentage') {
 						return {
-							...obj,
-							value: { type: 'percentage', value: value.value }
+							type: 'length-percentage',
+							value: { type: 'percentage', value: token_or_value.value.value }
 						} as const
 					}
 
-					throw new Error(`Unsupported value type: ${type}`)
+					throw new Error(`Unsupported value type: ${token_or_value.type}`)
 				}
 
 				const height = parse_value(value[0])
 				const width = value[2] ? parse_value(value[2]) : height
+
+				if (!height || !width) return
 
 				return [
 					{ property: 'height', value: height },
@@ -70,4 +55,4 @@ export const size = {
 			}
 		}
 	}
-}
+} satisfies Visitor<CustomAtRules>

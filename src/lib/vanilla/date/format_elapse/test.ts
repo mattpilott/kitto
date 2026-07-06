@@ -57,9 +57,29 @@ describe('format_elapse', () => {
 		expect(result).toBe('Yesterday at 10:20')
 	})
 
-	it('should return false for dates older than yesterday', () => {
-		const old_date = new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
+	it('should return "N days ago" for dates 2+ days ago within max', () => {
+		const now = new Date().getTime()
+		expect(format_elapse(new Date(now - 2 * 24 * 60 * 60 * 1000))).toBe('2 days ago')
+		expect(format_elapse(new Date(now - 3 * 24 * 60 * 60 * 1000))).toBe('3 days ago')
+	})
+
+	it('should return false for dates older than max', () => {
+		const old_date = new Date(new Date().getTime() - 4 * 24 * 60 * 60 * 1000) // 4 days ago
 		const result = format_elapse(old_date)
 		expect(result).toBe(false)
+	})
+
+	it('should respect a custom max', () => {
+		const now = new Date().getTime()
+		expect(format_elapse(new Date(now - 3 * 24 * 60 * 60 * 1000), true, 2)).toBe(false)
+		expect(format_elapse(new Date(now - 10 * 24 * 60 * 60 * 1000), true, 14)).toBe('10 days ago')
+	})
+
+	it('should omit the time when time is false', () => {
+		vi.useFakeTimers()
+		vi.setSystemTime(new Date('2024-06-15T14:00:00'))
+		expect(format_elapse(new Date('2024-06-15T12:00:00'), false)).toBe('Today')
+		expect(format_elapse(new Date('2024-06-14T12:00:00'), false)).toBe('Yesterday')
+		vi.useRealTimers()
 	})
 })

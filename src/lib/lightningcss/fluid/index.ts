@@ -45,7 +45,7 @@ export const fluid = ({ vmin = 320, vmax = 1600, root = 16 } = {}) =>
 				const rem = min_y_in_px / root
 
 				const vmin_factor = vmin / 100
-				const scale_factor = (100 * (max_y_in_px - min_y_in_px)) / ((vmax - 2) - vmin)
+				const scale_factor = (100 * (max_y_in_px - min_y_in_px)) / (vmax - 2 - vmin)
 
 				const scalar = `${rem.toFixed(4)}rem + ((1vw - ${vmin_factor.toFixed(1)}px) * ${scale_factor.toFixed(4)})`
 

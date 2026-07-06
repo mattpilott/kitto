@@ -22,7 +22,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(1, 'rem'), {} as never, create_mock_argument(2, 'rem')]
 		})
 
-		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 0.0px) * 1.0000), 2rem)')
+		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 0.0px) * 1.0013), 2rem)')
 	})
 
 	it('generates correct clamp function for px units', () => {
@@ -31,7 +31,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(16, 'px'), {} as never, create_mock_argument(32, 'px')]
 		})
 
-		expect(result!.raw).toBe('clamp(16px, 1.0000rem + ((1vw - 0.0px) * 1.0000), 32px)')
+		expect(result!.raw).toBe('clamp(16px, 1.0000rem + ((1vw - 0.0px) * 1.0013), 32px)')
 	})
 
 	it('handles mixed units (px and rem)', () => {
@@ -40,7 +40,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(16, 'px'), {} as never, create_mock_argument(2, 'rem')]
 		})
 
-		expect(result!.raw).toBe('clamp(16px, 1.0000rem + ((1vw - 0.0px) * 1.0000), 2rem)')
+		expect(result!.raw).toBe('clamp(16px, 1.0000rem + ((1vw - 0.0px) * 1.0013), 2rem)')
 	})
 
 	it('works with custom vmin, vmax, and root values', () => {
@@ -50,7 +50,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(1, 'rem'), {} as never, create_mock_argument(2, 'rem')]
 		})
 
-		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 3.2px) * 1.1250), 2rem)')
+		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 3.2px) * 1.1264), 2rem)')
 	})
 
 	it('handles small differences between min and max sizes', () => {
@@ -59,7 +59,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(0.9, 'rem'), {} as never, create_mock_argument(1, 'rem')]
 		})
 
-		expect(result!.raw).toBe('clamp(0.9rem, 0.9000rem + ((1vw - 0.0px) * 0.1000), 1rem)')
+		expect(result!.raw).toBe('clamp(0.9rem, 0.9000rem + ((1vw - 0.0px) * 0.1001), 1rem)')
 	})
 
 	it('handles large differences between min and max sizes', () => {
@@ -68,7 +68,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(1, 'rem'), {} as never, create_mock_argument(10, 'rem')]
 		})
 
-		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 0.0px) * 9.0000), 10rem)')
+		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 0.0px) * 9.0113), 10rem)')
 	})
 
 	it('handles decimal values', () => {
@@ -77,7 +77,7 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(1.2, 'rem'), {} as never, create_mock_argument(2.5, 'rem')]
 		})
 
-		expect(result!.raw).toBe('clamp(1.2rem, 1.2000rem + ((1vw - 0.0px) * 1.3000), 2.5rem)')
+		expect(result!.raw).toBe('clamp(1.2rem, 1.2000rem + ((1vw - 0.0px) * 1.3016), 2.5rem)')
 	})
 
 	it('handles zero as minimum value', () => {
@@ -86,6 +86,6 @@ describe('fluid typography visitor', () => {
 			arguments: [create_mock_argument(0, 'px'), {} as never, create_mock_argument(16, 'px')]
 		})
 
-		expect(result!.raw).toBe('clamp(0px, 0.0000rem + ((1vw - 0.0px) * 1.0000), 16px)')
+		expect(result!.raw).toBe('clamp(0px, 0.0000rem + ((1vw - 0.0px) * 1.0013), 16px)')
 	})
 })
