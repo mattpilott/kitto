@@ -1,7 +1,5 @@
 export { click_out } from './click_out/index.js'
 export { click_out as clickOut } from './click_out/index.js'
-export { drag_scroll } from './drag_scroll/index.js'
-export { drag_scroll as dragScroll } from './drag_scroll/index.js'
 export { longpress } from './longpress/index.js'
 export { storable } from './storable/index.js'
 export { default as Overlay } from './overlay/index.svelte'
