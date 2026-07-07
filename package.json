@@ -1,6 +1,6 @@
 {
 	"name": "kitto",
-	"version": "1.5.1",
+	"version": "1.5.2",
 	"description": "A unique blend of tree-shakeable items for any web expedition",
 	"keywords": [
 		"svelte",
@@ -46,7 +46,8 @@
 			"default": "./dist/lightningcss/index.js"
 		},
 		"./reset": "./dist/styles/reset.css",
-		"./unify": "./dist/styles/unify.css"
+		"./unify": "./dist/styles/unify.css",
+		"./palette": "./dist/styles/palette.css"
 	},
 	"publishConfig": {
 		"access": "public"
