@@ -3,55 +3,52 @@ import type { CustomAtRules, CustomProperty, TokenOrValue, Visitor } from 'light
 /**
  * @module size
  * @group LightningCSS
- * @version 1.0.1
- * @remarks Shorthand for height and width css properties.
- *
- * @param [params={}] - The parameters object.
- * @param [params.vmin=0] - The minimum viewport width.
- * @param [params.vmax=1600] - The maximum viewport width.
- * @param [params.root=16] - The root font size in pixels.
- * @returns An object containing the `fluid` function.
+ * @version 2.0.0
+ * @remarks Shorthand for the height and width css properties. Accepts any valid
+ * height/width value: lengths in any unit, percentages, keywords, `var()`,
+ * `calc()` and friends.
  *
  * @example
  * ```css
  * div { size: 100px; } = div { height: 100px; width: 100px; }
  * div { size: 100px 200px; } = div { height: 100px; width: 200px; }
+ * div { size: 50% auto; } = div { height: 50%; width: auto; }
+ * div { size: var(--s); } = div { height: var(--s); width: var(--s); }
+ * div { size: calc(100% - 2rem) min(50vw, 300px); }
  * ```
  */
+
+// lightningcss's deserializer rejects the explicit nulls its own parser emits
+function strip_nulls<T>(value: T): T {
+	if (Array.isArray(value)) return value.map(strip_nulls) as T
+	if (value && typeof value === 'object')
+		return Object.fromEntries(
+			Object.entries(value)
+				.filter(([, v]) => v !== null)
+				.map(([k, v]) => [k, strip_nulls(v)])
+		) as T
+	return value
+}
 
 export const size = {
 	Declaration: {
 		custom: {
 			size({ value }: CustomProperty) {
-				function parse_value(token_or_value: TokenOrValue | undefined) {
-					if (!token_or_value) return
-
-					if (token_or_value.type === 'length') {
-						return {
-							type: 'length-percentage',
-							value: { type: 'dimension', value: token_or_value.value }
-						} as const
-					}
-
-					if (token_or_value.type === 'token' && token_or_value.value.type === 'percentage') {
-						return {
-							type: 'length-percentage',
-							value: { type: 'percentage', value: token_or_value.value.value }
-						} as const
-					}
-
-					throw new Error(`Unsupported value type: ${token_or_value.type}`)
+				// group tokens by top-level whitespace: `size: <height> <width>?`
+				const groups: TokenOrValue[][] = [[]]
+				for (const token of value) {
+					if (token.type === 'token' && token.value.type === 'white-space') groups.push([])
+					else groups.at(-1)!.push(strip_nulls(token))
 				}
 
-				const height = parse_value(value[0])
-				const width = value[2] ? parse_value(value[2]) : height
-
-				if (!height || !width) return
+				const [height, width = height, extra] = groups.filter(group => group.length)
+				if (!height) return
+				if (extra) throw new Error('size accepts at most two values: `size: <height> <width>?`')
 
 				return [
-					{ property: 'height', value: height },
-					{ property: 'width', value: width }
-				]
+					{ property: 'unparsed', value: { propertyId: { property: 'height' }, value: height } },
+					{ property: 'unparsed', value: { propertyId: { property: 'width' }, value: width } }
+				] as const
 			}
 		}
 	}

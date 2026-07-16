@@ -1,80 +1,48 @@
 import { describe, it, expect } from 'vitest'
+import { transform } from 'lightningcss'
 import { size } from './index.js'
 
-const whitespace = { type: 'token', value: { type: 'white-space', value: ' ' } } as const
+const run = (css: string) =>
+	transform({ filename: 'test.css', code: Buffer.from(css), visitor: size, minify: true }).code.toString()
 
 describe('size visitor', () => {
-	it('should convert size: 100px to height: 100px and width: 100px', () => {
-		const input = { name: 'size', value: [{ type: 'length', value: { unit: 'px', value: 100 } } as const] }
-		const result = size.Declaration.custom.size(input)
-		expect(result).toEqual([
-			{
-				property: 'height',
-				value: {
-					type: 'length-percentage',
-					value: { type: 'dimension', value: { unit: 'px', value: 100 } }
-				}
-			},
-			{
-				property: 'width',
-				value: {
-					type: 'length-percentage',
-					value: { type: 'dimension', value: { unit: 'px', value: 100 } }
-				}
-			}
-		])
+	it('converts size: 100px to height and width', () => {
+		expect(run('div { size: 100px; }')).toBe('div{height:100px;width:100px}')
 	})
 
-	it('should convert size: 100px 200px to height: 100px and width: 200px', () => {
-		const input = {
-			name: 'size',
-			value: [
-				{ type: 'length', value: { unit: 'px', value: 100 } } as const,
-				whitespace,
-				{ type: 'length', value: { unit: 'px', value: 200 } } as const
-			]
-		}
-		const result = size.Declaration.custom.size(input)
-		expect(result).toEqual([
-			{
-				property: 'height',
-				value: {
-					type: 'length-percentage',
-					value: { type: 'dimension', value: { unit: 'px', value: 100 } }
-				}
-			},
-			{
-				property: 'width',
-				value: {
-					type: 'length-percentage',
-					value: { type: 'dimension', value: { unit: 'px', value: 200 } }
-				}
-			}
-		])
+	it('converts size: 100px 200px to separate height and width', () => {
+		expect(run('div { size: 100px 200px; }')).toBe('div{height:100px;width:200px}')
 	})
 
-	it('should throw an error for unsupported value type', () => {
-		const input = { name: 'size', value: [{ type: 'unsupported', value: 100 }] }
-		expect(() => size.Declaration.custom.size(input as never)).toThrowError(
-			'Unsupported value type: unsupported'
+	it('supports percentages', () => {
+		expect(run('div { size: 50%; }')).toBe('div{height:50.0%;width:50.0%}')
+	})
+
+	it('supports any unit', () => {
+		expect(run('div { size: 2em 50vh; }')).toBe('div{height:2em;width:50vh}')
+	})
+
+	it('supports css variables', () => {
+		expect(run('div { size: var(--s); }')).toBe('div{height:var(--s);width:var(--s)}')
+	})
+
+	it('supports css variables with fallbacks', () => {
+		expect(run('div { size: var(--h, 4rem) var(--w); }')).toBe('div{height:var(--h,4rem);width:var(--w)}')
+	})
+
+	it('supports calc and math functions', () => {
+		expect(run('div { size: calc(100% - 2rem) min(50vw, 300px); }')).toBe(
+			'div{height:calc(100.0% - 2rem);width:min(50vw, 300px)}'
 		)
 	})
 
-	it('should convert size: 50% to height: 50% and width: 50%', () => {
-		const input = {
-			name: 'size',
-			value: [{ type: 'token', value: { type: 'percentage', value: 50 } } as const]
-		}
-		const result = size.Declaration.custom.size(input)
-		expect(result).toEqual([
-			{
-				property: 'height',
-				value: { type: 'length-percentage', value: { type: 'percentage', value: 50 } }
-			},
-			{
-				property: 'width',
-				value: { type: 'length-percentage', value: { type: 'percentage', value: 50 } }
-			}
-		])
+	it('supports keywords', () => {
+		expect(run('div { size: auto; }')).toBe('div{height:auto;width:auto}')
+	})
+
+	it('throws for more than two values', () => {
+		expect(() => run('div { size: 1px 2px 3px; }')).toThrowError(
+			'size accepts at most two values: `size: <height> <width>?`'
+		)
 	})
 })
