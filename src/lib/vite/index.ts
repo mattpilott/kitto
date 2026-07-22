@@ -1,3 +1,4 @@
+export { kitto } from './kitto/index.js'
 export { deploy_env } from './deploy_env/index.js'
 export { deploy_env as deployEnv } from './deploy_env/index.js'
 export { prepend_css } from './prepend_css/index.js'

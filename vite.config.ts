@@ -1,27 +1,23 @@
 import { svelteTesting } from '@testing-library/svelte/vite'
 import { sveltekit } from '@sveltejs/kit/vite'
 import { defineConfig } from 'vitest/config'
-import { composeVisitors } from 'lightningcss'
-import { breakpoints, fluid, size } from './src/lib/lightningcss/index.js'
+import { kitto } from './src/lib/vite/kitto/index.js'
 
 export default defineConfig({
-	plugins: [sveltekit()],
-	css: {
-		transformer: 'lightningcss',
-		lightningcss: {
-			drafts: { customMedia: true },
-			visitor: composeVisitors([
-				breakpoints({
-					mobile: 640,
-					tablet: 1024,
-					laptop: 1280,
-					desktop: 1440
-				}),
-				fluid({ vmax: 1600 }),
-				size
-			])
-		}
-	},
+	plugins: [
+		sveltekit(),
+		kitto({
+			breakpoints: {
+				mobile: 640,
+				tablet: 1024,
+				laptop: 1280,
+				desktop: 1440
+			},
+			fluid: { vmax: 1600 },
+			defines: false,
+			https: false
+		})
+	],
 	server: {
 		port: 1313
 	},

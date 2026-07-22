@@ -1,6 +1,6 @@
 {
 	"name": "kitto",
-	"version": "1.7.0",
+	"version": "1.8.0",
 	"description": "A unique blend of tree-shakeable items for any web expedition",
 	"keywords": [
 		"svelte",
@@ -18,6 +18,8 @@
 	},
 	"files": [
 		"dist",
+		"!dist/**/test.*",
+		"!dist/**/bench.*",
 		"!dist/**/*.test.*",
 		"!dist/**/*.spec.*"
 	],

@@ -3,8 +3,11 @@ import type { CustomAtRules, MediaQuery, Visitor } from 'lightningcss'
 /**
  * @module breakpoints
  * @group LightningCSS
- * @version 2.0.0
- * @remarks Generates a media query handler for custom breakpoints.
+ * @version 3.0.0
+ * @remarks Generates a media query handler for custom breakpoints. Queries use
+ * `(--from-<breakpoint>)` for min-width, `(--until-<breakpoint>)` for max-width and
+ * `(--only-<breakpoint>)` for the range from that breakpoint until the next one up
+ * (open-ended on the largest); any other prefix on a known breakpoint throws at build time.
  *
  * @param breakpoints - An object containing breakpoint values.
  * @returns An object with a Rule containing the media function.
@@ -34,13 +37,29 @@ export const breakpoints = (breakpoints: Record<string, number>) =>
 			conds.forEach(cond => {
 				if (!('value' in cond) || !('name' in cond.value)) return
 				const { name } = cond.value
-				const [till, device] = name.split('--').pop()?.split('-') ?? []
-				if (!till || !device) return
+				const [prefix, device] = name.split('--').pop()?.split('-') ?? []
 
-				const minmax = till === 'from' ? 'min' : 'max'
-				const point = breakpoints[device] - ~~(till !== 'from')
+				if (prefix === 'from' || prefix === 'until') {
+					const minmax = prefix === 'from' ? 'min' : 'max'
+					const point = breakpoints[device] - ~~(prefix !== 'from')
 
-				queries.push(`(${minmax}-width: ${point / 16}em)`)
+					queries.push(`(${minmax}-width: ${point / 16}em)`)
+				} else if (prefix === 'only') {
+					// span from this breakpoint until just before the next one up;
+					// the largest breakpoint has nothing above, so it stays open-ended
+					const from = breakpoints[device]
+					const next = Math.min(...Object.values(breakpoints).filter(value => value > from))
+					const range = Number.isFinite(next)
+						? `(min-width: ${from / 16}em) and (max-width: ${(next - 1) / 16}em)`
+						: `(min-width: ${from / 16}em)`
+
+					queries.push(conds.length > 1 ? `(${range})` : range)
+				} else {
+					const target = device ?? prefix
+					throw new Error(
+						`[kitto] unknown breakpoint query (${name}); use (--from-${target}) for min-width, (--until-${target}) for max-width or (--only-${target}) for just that range`
+					)
+				}
 			})
 
 			if (!queries.length) return query

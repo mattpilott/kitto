@@ -26,11 +26,68 @@ describe('breakpoints function', () => {
 		const input = {
 			condition: {
 				operator: 'and',
-				conditions: [{ value: { name: '--from-md' } }, { value: { name: '--to-lg' } }]
+				conditions: [{ value: { name: '--from-md' } }, { value: { name: '--until-lg' } }]
 			}
 		}
 		const result = media_query(input as never)
 		expect(result).toEqual({ raw: '(min-width: 48em) and (max-width: 63.9375em)' })
+	})
+
+	it('should generate a range for --only-', () => {
+		const input = {
+			condition: {
+				operator: 'and',
+				conditions: [{ value: { name: '--only-md' } }]
+			}
+		}
+		const result = media_query(input as never)
+		expect(result).toEqual({ raw: '(min-width: 48em) and (max-width: 63.9375em)' })
+	})
+
+	it('should leave --only- open-ended on the largest breakpoint', () => {
+		const input = {
+			condition: {
+				operator: 'and',
+				conditions: [{ value: { name: '--only-xl' } }]
+			}
+		}
+		const result = media_query(input as never)
+		expect(result).toEqual({ raw: '(min-width: 80em)' })
+	})
+
+	it('should parenthesise --only- when combined with other conditions', () => {
+		const input = {
+			condition: {
+				operator: 'and',
+				conditions: [{ value: { name: '--only-md' } }, { value: { name: '--from-sm' } }]
+			}
+		}
+		const result = media_query(input as never)
+		expect(result).toEqual({ raw: '((min-width: 48em) and (max-width: 63.9375em)) and (min-width: 40em)' })
+	})
+
+	it('should throw on an unknown prefix, showing the correct syntax', () => {
+		const input = {
+			condition: {
+				operator: 'and',
+				conditions: [{ value: { name: '--to-lg' } }]
+			}
+		}
+		expect(() => media_query(input as never)).toThrow(
+			'[kitto] unknown breakpoint query (--to-lg); use (--from-lg) for min-width, (--until-lg) for max-width or (--only-lg) for just that range'
+		)
+	})
+
+	it('should throw on a missing prefix, showing the correct syntax', () => {
+		const input = {
+			condition: {
+				operator: 'and',
+				conditions: [{ value: { name: '--lg' } }]
+			}
+		}
+		expect(() => media_query(input as never)).toThrow(
+			'use (--from-lg) for min-width, (--until-lg) for max-width or (--only-lg) for just that range'
+		)
 	})
 
 	it('should return original media if no custom breakpoints matched', () => {
