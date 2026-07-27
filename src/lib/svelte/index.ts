@@ -1,5 +1,7 @@
 export { click_out } from './click_out/index.js'
 export { click_out as clickOut } from './click_out/index.js'
 export { longpress } from './longpress/index.js'
+export { slider } from './slider/index.svelte.js'
+export type { SliderController } from './slider/index.svelte.js'
 export { storable } from './storable/index.js'
 export { default as Overlay } from './overlay/index.svelte'

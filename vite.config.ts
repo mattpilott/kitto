@@ -40,7 +40,12 @@ export default defineConfig({
 					name: 'client',
 					environment: 'jsdom',
 					clearMocks: true,
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/**/*/test.{js,ts}'],
+					// test.svelte.ts is compiled by svelte, so those suites can use runes
+					include: [
+						'src/**/*.svelte.{test,spec}.{js,ts}',
+						'src/**/*/test.{js,ts}',
+						'src/**/*/test.svelte.ts'
+					],
 					exclude: ['src/lib/server/**'],
 					setupFiles: ['./vitest-setup-client.ts']
 				}

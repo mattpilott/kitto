@@ -1,695 +1,647 @@
+import { clamp } from '../../number/clamp/index.js'
+
 /**
- * Hi :-) This is a class representing a Siema.
+ * @module slider
+ * @group Vanilla
+ * @version 1.0.0
+ * @remarks
+ * A small, dependency-free carousel. Descended from Siema but rebuilt on modern
+ * primitives: a flexbox track driven by a single `--slider-per-page` custom property,
+ * Pointer Events with pointer capture for dragging, and a `ResizeObserver` for
+ * measurement. Slides are the element's own children — they are never wrapped, so your
+ * own CSS keeps working.
+ *
+ * State is reported with `CustomEvent`s on the element rather than option callbacks:
+ * `sliderinit`, `sliderchange` and `sliderdestroy`. `sliderinit` fires in a microtask,
+ * so you can attach listeners immediately after constructing the slider.
+ *
+ * Accessible by default: the element becomes a labelled carousel region, slides are
+ * announced positionally, looped clones are `inert`, arrow keys navigate, and
+ * `prefers-reduced-motion` disables both animation and autoplay.
+ *
+ * The element is styled with `overflow: hidden` and `touch-action: pan-y`, so vertical
+ * page scrolling passes through a horizontal drag untouched.
+ *
+ * @example
+ * ```ts
+ * import { slider } from 'kitto'
+ *
+ * const el = document.querySelector('.slider')
+ *
+ * const carousel = slider(el, {
+ *   per_page: { 0: 1, 640: 2, 1024: 3 },
+ *   loop: true,
+ *   autoplay: 4000
+ * })
+ *
+ * el.addEventListener('sliderchange', e => console.log(e.detail.index))
+ *
+ * document.querySelector('.next').onclick = () => carousel.next()
+ * ```
  */
-export default class Siema {
-   /**
-    * Create a Siema.
-    * @param {Object} options - Optional settings object.
-    */
-   constructor(options) {
-     // Merge defaults with user's settings
-     this.config = Siema.mergeSettings(options);
- 
-     // Resolve selector's type
-     this.selector = typeof this.config.selector === 'string' ? document.querySelector(this.config.selector) : this.config.selector;
- 
-     // Early throw if selector doesn't exists
-     if (this.selector === null) {
-       throw new Error('Something wrong with your selector 😭');
-     }
- 
-     // update perPage number dependable of user value
-     this.resolveSlidesNumber();
- 
-     // Create global references
-     this.selectorWidth = this.selector.offsetWidth;
-     this.innerElements = [].slice.call(this.selector.children);
-     this.currentSlide = this.config.loop ?
-       this.config.startIndex % this.innerElements.length :
-       Math.max(0, Math.min(this.config.startIndex, this.innerElements.length - this.perPage));
-     this.transformProperty = Siema.webkitOrNot();
- 
-     // Bind all event handlers for referencability
-     ['resizeHandler', 'touchstartHandler', 'touchendHandler', 'touchmoveHandler', 'mousedownHandler', 'mouseupHandler', 'mouseleaveHandler', 'mousemoveHandler', 'clickHandler'].forEach(method => {
-       this[method] = this[method].bind(this);
-     });
- 
-     // Build markup and apply required styling to elements
-     this.init();
-   }
- 
- 
-   /**
-    * Overrides default settings with custom ones.
-    * @param {Object} options - Optional settings object.
-    * @returns {Object} - Custom Siema settings.
-    */
-   static mergeSettings(options) {
-     const settings = {
-       selector: '.siema',
-       duration: 200,
-       easing: 'ease-out',
-       perPage: 1,
-       startIndex: 0,
-       draggable: true,
-       multipleDrag: true,
-       threshold: 20,
-       loop: false,
-       rtl: false,
-       onInit: () => {},
-       onChange: () => {},
-     };
- 
-     const userSttings = options;
-     for (const attrname in userSttings) {
-       settings[attrname] = userSttings[attrname];
-     }
- 
-     return settings;
-   }
- 
- 
-   /**
-    * Determine if browser supports unprefixed transform property.
-    * Google Chrome since version 26 supports prefix-less transform
-    * @returns {string} - Transform property supported by client.
-    */
-   static webkitOrNot() {
-     const style = document.documentElement.style;
-     if (typeof style.transform === 'string') {
-       return 'transform';
-     }
-     return 'WebkitTransform';
-   }
- 
-   /**
-    * Attaches listeners to required events.
-    */
-   attachEvents() {
-     // Resize element on window resize
-     window.addEventListener('resize', this.resizeHandler);
- 
-     // If element is draggable / swipable, add event handlers
-     if (this.config.draggable) {
-       // Keep track pointer hold and dragging distance
-       this.pointerDown = false;
-       this.drag = {
-         startX: 0,
-         endX: 0,
-         startY: 0,
-         letItGo: null,
-         preventClick: false,
-       };
- 
-       const eventOptions = { passive: true };
- 
-       // Touch events
-       this.selector.addEventListener('touchstart', this.touchstartHandler, eventOptions);
-       this.selector.addEventListener('touchend', this.touchendHandler, eventOptions);
-       this.selector.addEventListener('touchmove', this.touchmoveHandler, eventOptions);
- 
-       // Mouse events
-       this.selector.addEventListener('mousedown', this.mousedownHandler, eventOptions);
-       this.selector.addEventListener('mouseup', this.mouseupHandler, eventOptions);
-       this.selector.addEventListener('mouseleave', this.mouseleaveHandler, eventOptions);
-       this.selector.addEventListener('mousemove', this.mousemoveHandler, eventOptions);
- 
-       // Click
-       this.selector.addEventListener('click', this.clickHandler);
-     }
-   }
- 
- 
-   /**
-    * Detaches listeners from required events.
-    */
-   detachEvents() {
-     window.removeEventListener('resize', this.resizeHandler);
-     this.selector.removeEventListener('touchstart', this.touchstartHandler);
-     this.selector.removeEventListener('touchend', this.touchendHandler);
-     this.selector.removeEventListener('touchmove', this.touchmoveHandler);
-     this.selector.removeEventListener('mousedown', this.mousedownHandler);
-     this.selector.removeEventListener('mouseup', this.mouseupHandler);
-     this.selector.removeEventListener('mouseleave', this.mouseleaveHandler);
-     this.selector.removeEventListener('mousemove', this.mousemoveHandler);
-     this.selector.removeEventListener('click', this.clickHandler);
-   }
- 
- 
-   /**
-    * Builds the markup and attaches listeners to required events.
-    */
-   init() {
-     this.attachEvents();
- 
-     // hide everything out of selector's boundaries
-     this.selector.style.overflow = 'hidden';
- 
-     // rtl or ltr
-     this.selector.style.direction = this.config.rtl ? 'rtl' : 'ltr';
- 
-     // build a frame and slide to a currentSlide
-     this.buildSliderFrame();
- 
-     this.config.onInit.call(this);
-   }
- 
- 
-   /**
-    * Build a sliderFrame and slide to a current item.
-    */
-   buildSliderFrame() {
-     const widthItem = this.selectorWidth / this.perPage;
-     const itemsToBuild = this.config.loop ? this.innerElements.length + (2 * this.perPage) : this.innerElements.length;
- 
-     // Create frame and apply styling
-     this.sliderFrame = document.createElement('div');
-     this.sliderFrame.style.width = `${widthItem * itemsToBuild}px`;
-     this.enableTransition();
- 
-     if (this.config.draggable) {
-       this.selector.style.cursor = '-webkit-grab';
-     }
- 
-     // Create a document fragment to put slides into it
-     const docFragment = document.createDocumentFragment();
- 
-     // Loop through the slides, add styling and add them to document fragment
-     if (this.config.loop) {
-       for (let i = this.innerElements.length - this.perPage; i < this.innerElements.length; i++) {
-         const element = this.buildSliderFrameItem(this.innerElements[i].cloneNode(true));
-         docFragment.appendChild(element);
-       }
-     }
-     for (let i = 0; i < this.innerElements.length; i++) {
-       const element = this.buildSliderFrameItem(this.innerElements[i]);
-       docFragment.appendChild(element);
-     }
-     if (this.config.loop) {
-       for (let i = 0; i < this.perPage; i++) {
-         const element = this.buildSliderFrameItem(this.innerElements[i].cloneNode(true));
-         docFragment.appendChild(element);
-       }
-     }
- 
-     // Add fragment to the frame
-     this.sliderFrame.appendChild(docFragment);
- 
-     // Clear selector (just in case something is there) and insert a frame
-     this.selector.innerHTML = '';
-     this.selector.appendChild(this.sliderFrame);
- 
-     // Go to currently active slide after initial build
-     this.slideToCurrent();
-   }
- 
-   buildSliderFrameItem(elm) {
-     const elementContainer = document.createElement('div');
-     elementContainer.style.cssFloat = this.config.rtl ? 'right' : 'left';
-     elementContainer.style.float = this.config.rtl ? 'right' : 'left';
-     elementContainer.style.width = `${this.config.loop ? 100 / (this.innerElements.length + (this.perPage * 2)) : 100 / (this.innerElements.length)}%`;
-     elementContainer.appendChild(elm);
-     return elementContainer;
-   }
- 
- 
-   /**
-    * Determinates slides number accordingly to clients viewport.
-    */
-   resolveSlidesNumber() {
-     if (typeof this.config.perPage === 'number') {
-       this.perPage = this.config.perPage;
-     }
-     else if (typeof this.config.perPage === 'object') {
-       this.perPage = 1;
-       for (const viewport in this.config.perPage) {
-         if (window.innerWidth >= viewport) {
-           this.perPage = this.config.perPage[viewport];
-         }
-       }
-     }
-   }
- 
- 
-   /**
-    * Go to previous slide.
-    * @param {number} [howManySlides=1] - How many items to slide backward.
-    * @param {function} callback - Optional callback function.
-    */
-   prev(howManySlides = 1, callback) {
-     // early return when there is nothing to slide
-     if (this.innerElements.length <= this.perPage) {
-       return;
-     }
- 
-     const beforeChange = this.currentSlide;
- 
-     if (this.config.loop) {
-       const isNewIndexClone = this.currentSlide - howManySlides < 0;
-       if (isNewIndexClone) {
-         this.disableTransition();
- 
-         const mirrorSlideIndex = this.currentSlide + this.innerElements.length;
-         const mirrorSlideIndexOffset = this.perPage;
-         const moveTo = mirrorSlideIndex + mirrorSlideIndexOffset;
-         const offset = (this.config.rtl ? 1 : -1) * moveTo * (this.selectorWidth / this.perPage);
-         const dragDistance = this.config.draggable ? this.drag.endX - this.drag.startX : 0;
- 
-         this.sliderFrame.style[this.transformProperty] = `translate3d(${offset + dragDistance}px, 0, 0)`;
-         this.currentSlide = mirrorSlideIndex - howManySlides;
-       }
-       else {
-         this.currentSlide = this.currentSlide - howManySlides;
-       }
-     }
-     else {
-       this.currentSlide = Math.max(this.currentSlide - howManySlides, 0);
-     }
- 
-     if (beforeChange !== this.currentSlide) {
-       this.slideToCurrent(this.config.loop);
-       this.config.onChange.call(this);
-       if (callback) {
-         callback.call(this);
-       }
-     }
-   }
- 
- 
-   /**
-    * Go to next slide.
-    * @param {number} [howManySlides=1] - How many items to slide forward.
-    * @param {function} callback - Optional callback function.
-    */
-   next(howManySlides = 1, callback) {
-     // early return when there is nothing to slide
-     if (this.innerElements.length <= this.perPage) {
-       return;
-     }
- 
-     const beforeChange = this.currentSlide;
- 
-     if (this.config.loop) {
-       const isNewIndexClone = this.currentSlide + howManySlides > this.innerElements.length - this.perPage;
-       if (isNewIndexClone) {
-         this.disableTransition();
- 
-         const mirrorSlideIndex = this.currentSlide - this.innerElements.length;
-         const mirrorSlideIndexOffset = this.perPage;
-         const moveTo = mirrorSlideIndex + mirrorSlideIndexOffset;
-         const offset = (this.config.rtl ? 1 : -1) * moveTo * (this.selectorWidth / this.perPage);
-         const dragDistance = this.config.draggable ? this.drag.endX - this.drag.startX : 0;
- 
-         this.sliderFrame.style[this.transformProperty] = `translate3d(${offset + dragDistance}px, 0, 0)`;
-         this.currentSlide = mirrorSlideIndex + howManySlides;
-       }
-       else {
-         this.currentSlide = this.currentSlide + howManySlides;
-       }
-     }
-     else {
-       this.currentSlide = Math.min(this.currentSlide + howManySlides, this.innerElements.length - this.perPage);
-     }
-     if (beforeChange !== this.currentSlide) {
-       this.slideToCurrent(this.config.loop);
-       this.config.onChange.call(this);
-       if (callback) {
-         callback.call(this);
-       }
-     }
-   }
- 
- 
-   /**
-    * Disable transition on sliderFrame.
-    */
-   disableTransition() {
-     this.sliderFrame.style.webkitTransition = `all 0ms ${this.config.easing}`;
-     this.sliderFrame.style.transition = `all 0ms ${this.config.easing}`;
-   }
- 
- 
-   /**
-    * Enable transition on sliderFrame.
-    */
-   enableTransition() {
-     this.sliderFrame.style.webkitTransition = `all ${this.config.duration}ms ${this.config.easing}`;
-     this.sliderFrame.style.transition = `all ${this.config.duration}ms ${this.config.easing}`;
-   }
- 
- 
-   /**
-    * Go to slide with particular index
-    * @param {number} index - Item index to slide to.
-    * @param {function} callback - Optional callback function.
-    */
-   goTo(index, callback) {
-     if (this.innerElements.length <= this.perPage) {
-       return;
-     }
-     const beforeChange = this.currentSlide;
-     this.currentSlide = this.config.loop ?
-       index % this.innerElements.length :
-       Math.min(Math.max(index, 0), this.innerElements.length - this.perPage);
-     if (beforeChange !== this.currentSlide) {
-       this.slideToCurrent();
-       this.config.onChange.call(this);
-       if (callback) {
-         callback.call(this);
-       }
-     }
-   }
- 
- 
-   /**
-    * Moves sliders frame to position of currently active slide
-    */
-   slideToCurrent(enableTransition) {
-     const currentSlide = this.config.loop ? this.currentSlide + this.perPage : this.currentSlide;
-     const offset = (this.config.rtl ? 1 : -1) * currentSlide * (this.selectorWidth / this.perPage);
- 
-     if (enableTransition) {
-       // This one is tricky, I know but this is a perfect explanation:
-       // https://youtu.be/cCOL7MC4Pl0
-       requestAnimationFrame(() => {
-         requestAnimationFrame(() => {
-           this.enableTransition();
-           this.sliderFrame.style[this.transformProperty] = `translate3d(${offset}px, 0, 0)`;
-         });
-       });
-     }
-     else {
-       this.sliderFrame.style[this.transformProperty] = `translate3d(${offset}px, 0, 0)`;
-     }
-   }
- 
- 
-   /**
-    * Recalculate drag /swipe event and reposition the frame of a slider
-    */
-   updateAfterDrag() {
-     const movement = (this.config.rtl ? -1 : 1) * (this.drag.endX - this.drag.startX);
-     const movementDistance = Math.abs(movement);
-     const howManySliderToSlide = this.config.multipleDrag ? Math.ceil(movementDistance / (this.selectorWidth / this.perPage)) : 1;
- 
-     const slideToNegativeClone = movement > 0 && this.currentSlide - howManySliderToSlide < 0;
-     const slideToPositiveClone = movement < 0 && this.currentSlide + howManySliderToSlide > this.innerElements.length - this.perPage;
- 
-     if (movement > 0 && movementDistance > this.config.threshold && this.innerElements.length > this.perPage) {
-       this.prev(howManySliderToSlide);
-     }
-     else if (movement < 0 && movementDistance > this.config.threshold && this.innerElements.length > this.perPage) {
-       this.next(howManySliderToSlide);
-     }
-     this.slideToCurrent(slideToNegativeClone || slideToPositiveClone);
-   }
- 
- 
-   /**
-    * When window resizes, resize slider components as well
-    */
-   resizeHandler() {
-     // update perPage number dependable of user value
-     this.resolveSlidesNumber();
- 
-     // relcalculate currentSlide
-     // prevent hiding items when browser width increases
-     if (this.currentSlide + this.perPage > this.innerElements.length) {
-       this.currentSlide = this.innerElements.length <= this.perPage ? 0 : this.innerElements.length - this.perPage;
-     }
- 
-     this.selectorWidth = this.selector.offsetWidth;
- 
-     this.buildSliderFrame();
-   }
- 
- 
-   /**
-    * Clear drag after touchend and mouseup event
-    */
-   clearDrag() {
-     this.drag = {
-       startX: 0,
-       endX: 0,
-       startY: 0,
-       letItGo: null,
-       preventClick: this.drag.preventClick
-     };
-   }
- 
- 
-   /**
-    * touchstart event handler
-    */
-   touchstartHandler(e) {
-     // Prevent dragging / swiping on inputs, selects and textareas
-     const ignoreSiema = ['TEXTAREA', 'OPTION', 'INPUT', 'SELECT'].indexOf(e.target.nodeName) !== -1;
-     if (ignoreSiema) {
-       return;
-     }
- 
-     e.stopPropagation();
-     this.pointerDown = true;
-     this.drag.startX = e.touches[0].pageX;
-     this.drag.startY = e.touches[0].pageY;
-   }
- 
- 
-   /**
-    * touchend event handler
-    */
-   touchendHandler(e) {
-     e.stopPropagation();
-     this.pointerDown = false;
-     this.enableTransition();
-     if (this.drag.endX) {
-       this.updateAfterDrag();
-     }
-     this.clearDrag();
-   }
- 
- 
-   /**
-    * touchmove event handler
-    */
-   touchmoveHandler(e) {
-     e.stopPropagation();
- 
-     if (this.drag.letItGo === null) {
-       this.drag.letItGo = Math.abs(this.drag.startY - e.touches[0].pageY) < Math.abs(this.drag.startX - e.touches[0].pageX);
-     }
- 
-     if (this.pointerDown && this.drag.letItGo) {
-       e.preventDefault();
-       this.drag.endX = e.touches[0].pageX;
-       this.sliderFrame.style.webkitTransition = `all 0ms ${this.config.easing}`;
-       this.sliderFrame.style.transition = `all 0ms ${this.config.easing}`;
- 
-       const currentSlide = this.config.loop ? this.currentSlide + this.perPage : this.currentSlide;
-       const currentOffset = currentSlide * (this.selectorWidth / this.perPage);
-       const dragOffset = (this.drag.endX - this.drag.startX);
-       const offset = this.config.rtl ? currentOffset + dragOffset : currentOffset - dragOffset;
-       this.sliderFrame.style[this.transformProperty] = `translate3d(${(this.config.rtl ? 1 : -1) * offset}px, 0, 0)`;
-     }
-   }
- 
- 
-   /**
-    * mousedown event handler
-    */
-   mousedownHandler(e) {
-     // Prevent dragging / swiping on inputs, selects and textareas
-     const ignoreSiema = ['TEXTAREA', 'OPTION', 'INPUT', 'SELECT'].indexOf(e.target.nodeName) !== -1;
-     if (ignoreSiema) {
-       return;
-     }
- 
-     e.preventDefault();
-     e.stopPropagation();
-     this.pointerDown = true;
-     this.drag.startX = e.pageX;
-   }
- 
- 
-   /**
-    * mouseup event handler
-    */
-   mouseupHandler(e) {
-     e.stopPropagation();
-     this.pointerDown = false;
-     this.selector.style.cursor = '-webkit-grab';
-     this.enableTransition();
-     if (this.drag.endX) {
-       this.updateAfterDrag();
-     }
-     this.clearDrag();
-   }
- 
- 
-   /**
-    * mousemove event handler
-    */
-   mousemoveHandler(e) {
-     e.preventDefault();
-     if (this.pointerDown) {
-       // if dragged element is a link
-       // mark preventClick prop as a true
-       // to detemine about browser redirection later on
-       if (e.target.nodeName === 'A') {
-         this.drag.preventClick = true;
-       }
- 
-       this.drag.endX = e.pageX;
-       this.selector.style.cursor = '-webkit-grabbing';
-       this.sliderFrame.style.webkitTransition = `all 0ms ${this.config.easing}`;
-       this.sliderFrame.style.transition = `all 0ms ${this.config.easing}`;
- 
-       const currentSlide = this.config.loop ? this.currentSlide + this.perPage : this.currentSlide;
-       const currentOffset = currentSlide * (this.selectorWidth / this.perPage);
-       const dragOffset = (this.drag.endX - this.drag.startX);
-       const offset = this.config.rtl ? currentOffset + dragOffset : currentOffset - dragOffset;
-       this.sliderFrame.style[this.transformProperty] = `translate3d(${(this.config.rtl ? 1 : -1) * offset}px, 0, 0)`;
-     }
-   }
- 
- 
-   /**
-    * mouseleave event handler
-    */
-   mouseleaveHandler(e) {
-     if (this.pointerDown) {
-       this.pointerDown = false;
-       this.selector.style.cursor = '-webkit-grab';
-       this.drag.endX = e.pageX;
-       this.drag.preventClick = false;
-       this.enableTransition();
-       this.updateAfterDrag();
-       this.clearDrag();
-     }
-   }
- 
- 
-   /**
-    * click event handler
-    */
-   clickHandler(e) {
-     // if the dragged element is a link
-     // prevent browsers from folowing the link
-     if (this.drag.preventClick) {
-       e.preventDefault();
-     }
-     this.drag.preventClick = false;
-   }
- 
- 
-   /**
-    * Remove item from carousel.
-    * @param {number} index - Item index to remove.
-    * @param {function} callback - Optional callback to call after remove.
-    */
-   remove(index, callback) {
-     if (index < 0 || index >= this.innerElements.length) {
-       throw new Error('Item to remove doesn\'t exist 😭');
-     }
- 
-     // Shift sliderFrame back by one item when:
-     // 1. Item with lower index than currenSlide is removed.
-     // 2. Last item is removed.
-     const lowerIndex = index < this.currentSlide;
-     const lastItem = this.currentSlide + this.perPage - 1 === index;
- 
-     if (lowerIndex || lastItem) {
-       this.currentSlide--;
-     }
- 
-     this.innerElements.splice(index, 1);
- 
-     // build a frame and slide to a currentSlide
-     this.buildSliderFrame();
- 
-     if (callback) {
-       callback.call(this);
-     }
-   }
- 
- 
-   /**
-    * Insert item to carousel at particular index.
-    * @param {HTMLElement} item - Item to insert.
-    * @param {number} index - Index of new new item insertion.
-    * @param {function} callback - Optional callback to call after insert.
-    */
-   insert(item, index, callback) {
-     if (index < 0 || index > this.innerElements.length + 1) {
-       throw new Error('Unable to inset it at this index 😭');
-     }
-     if (this.innerElements.indexOf(item) !== -1) {
-       throw new Error('The same item in a carousel? Really? Nope 😭');
-     }
- 
-     // Avoid shifting content
-     const shouldItShift = index <= this.currentSlide > 0 && this.innerElements.length;
-     this.currentSlide = shouldItShift ? this.currentSlide + 1 : this.currentSlide;
- 
-     this.innerElements.splice(index, 0, item);
- 
-     // build a frame and slide to a currentSlide
-     this.buildSliderFrame();
- 
-     if (callback) {
-       callback.call(this);
-     }
-   }
- 
- 
-   /**
-    * Prepernd item to carousel.
-    * @param {HTMLElement} item - Item to prepend.
-    * @param {function} callback - Optional callback to call after prepend.
-    */
-   prepend(item, callback) {
-     this.insert(item, 0);
-     if (callback) {
-       callback.call(this);
-     }
-   }
- 
- 
-   /**
-    * Append item to carousel.
-    * @param {HTMLElement} item - Item to append.
-    * @param {function} callback - Optional callback to call after append.
-    */
-   append(item, callback) {
-     this.insert(item, this.innerElements.length + 1);
-     if (callback) {
-       callback.call(this);
-     }
-   }
- 
- 
-   /**
-    * Removes listeners and optionally restores to initial markup
-    * @param {boolean} restoreMarkup - Determinants about restoring an initial markup.
-    * @param {function} callback - Optional callback function.
-    */
-   destroy(restoreMarkup = false, callback) {
-     this.detachEvents();
- 
-     this.selector.style.cursor = 'auto';
- 
-     if (restoreMarkup) {
-       const slides = document.createDocumentFragment();
-       for (let i = 0; i < this.innerElements.length; i++) {
-         slides.appendChild(this.innerElements[i]);
-       }
-       this.selector.innerHTML = '';
-       this.selector.appendChild(slides);
-       this.selector.removeAttribute('style');
-     }
- 
-     if (callback) {
-       callback.call(this);
-     }
-   }
- }
+
+/** Selector for descendants that should never start a drag. */
+const IGNORE = 'input, textarea, select, button, a[href], [contenteditable], [data-slider-ignore]'
+
+/** Per-slide sizing. Percentages resolve against the track, so changing the custom property resizes every slide. */
+const FLEX = '0 0 calc(100% / var(--slider-per-page, 1))'
+
+/** Movement in px before the drag axis is locked. */
+const AXIS_SLOP = 5
+
+/** Movement in px past which the click following a drag is swallowed. */
+const CLICK_SLOP = 5
+
+/**
+ * Coerce a slide count. Guards the two ways a bad value arrives: passing `next`/`prev`
+ * straight to an event listener, which supplies the event, and a drag measured against a
+ * zero-width container, which divides by zero.
+ */
+function to_count(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) ? value : 1
+}
+
+export interface SliderOptions {
+	/** Slides visible at once. Pass an object to vary it by viewport width, e.g. `{ 0: 1, 640: 2 }`. */
+	per_page?: number | Record<number, number>
+	/** Slide to show first. Default `0`. */
+	start_index?: number
+	/** Transition duration in ms. Default `200`. */
+	duration?: number
+	/** Transition easing. Default `'ease-out'`. */
+	easing?: string
+	/** Allow pointer dragging. Default `true`. */
+	draggable?: boolean
+	/** Let one long drag advance more than one slide. Default `true`. */
+	multiple_drag?: boolean
+	/** Drag distance in px required to change slide. Default `20`. */
+	threshold?: number
+	/** Wrap around at the ends using cloned slides. Default `false`. */
+	loop?: boolean
+	/** Lay the slides out right-to-left. Default `false`. */
+	rtl?: boolean
+	/** Navigate with arrow, Home and End keys. Default `true`. */
+	keyboard?: boolean
+	/** Advance automatically every n ms. `0` disables it. Default `0`. */
+	autoplay?: number
+	/** Accessible name for the carousel region. Default `'Carousel'`. */
+	label?: string
+}
+
+export interface Slider {
+	/** Index of the leading visible slide. */
+	readonly index: number
+	/** Number of slides. */
+	readonly length: number
+	/** Slides currently visible at once. */
+	readonly per_page: number
+	/** Advance by `count` slides. */
+	next(count?: number): void
+	/** Go back by `count` slides. */
+	prev(count?: number): void
+	/** Jump to a slide by index. */
+	go_to(index: number): void
+	/** Insert a slide at `index`. */
+	insert(item: HTMLElement, index: number): void
+	/** Remove the slide at `index`. */
+	remove(index: number): void
+	/** Insert a slide at the start. */
+	prepend(item: HTMLElement): void
+	/** Insert a slide at the end. */
+	append(item: HTMLElement): void
+	/** Start autoplay, if an `autoplay` interval was set. */
+	play(): void
+	/** Stop autoplay. */
+	pause(): void
+	/** Re-measure and re-render, e.g. after changing slide contents. */
+	update(): void
+	/** Detach everything and restore the original markup. */
+	destroy(): void
+}
+
+/**
+ * Create a slider from an element's children.
+ * @param target - The element to turn into a slider, or a selector for it
+ * @param options - Optional settings
+ * @returns A handle for controlling the slider
+ * @throws If `target` matches no element
+ */
+export function slider(target: HTMLElement | string, options: SliderOptions = {}): Slider {
+	const found = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target
+
+	if (!found) throw new Error(`slider: no element matches '${String(target)}'`)
+
+	// Re-declared non-nullable, since narrowing does not reach the hoisted helpers below.
+	const node: HTMLElement = found
+
+	const {
+		per_page = 1,
+		start_index = 0,
+		duration = 200,
+		easing = 'ease-out',
+		draggable = true,
+		multiple_drag = true,
+		threshold = 20,
+		loop = false,
+		rtl = false,
+		keyboard = true,
+		autoplay = 0,
+		label = 'Carousel'
+	} = options
+
+	/** Breakpoints sorted ascending, so the widest match wins regardless of key order. */
+	const breakpoints =
+		typeof per_page === 'object'
+			? Object.entries(per_page)
+					.map(([width, value]): [number, number] => [Number(width), value])
+					.sort((a, b) => a[0] - b[0])
+			: []
+
+	const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+	const track = document.createElement('div')
+
+	const slides = [...node.children] as HTMLElement[]
+	let pages = resolve_pages()
+	let width = 0
+	let index = loop ? wrap(start_index) : clamp(start_index, 0, max_index())
+	let reduced = motion?.matches ?? false
+	let destroyed = false
+
+	// Drag state. `delta` stays set until the drag has been fully settled, so a clone jump
+	// mid-drag can account for the distance already travelled.
+	let pointer_id: number | null = null
+	let start_x = 0
+	let start_y = 0
+	let delta = 0
+	let axis: 'x' | 'y' | null = null
+
+	let timer: ReturnType<typeof setTimeout> | undefined
+	let wants_play = autoplay > 0
+
+	/* Geometry */
+
+	function resolve_pages(): number {
+		if (typeof per_page === 'number') return Math.max(1, per_page)
+
+		let value = 1
+		for (const [breakpoint, count] of breakpoints) if (window.innerWidth >= breakpoint) value = count
+		return Math.max(1, value)
+	}
+
+	/** Highest index that still fills the viewport. */
+	function max_index(): number {
+		return Math.max(0, slides.length - pages)
+	}
+
+	/** Bring an index into range, wrapping negatives when looping. */
+	function wrap(value: number): number {
+		const total = slides.length
+		return total ? ((value % total) + total) % total : 0
+	}
+
+	/** Track offset in px for a slide index, accounting for the leading clones and direction. */
+	function offset_for(value: number): number {
+		return (rtl ? 1 : -1) * (loop ? value + pages : value) * (width / pages)
+	}
+
+	function translate(x: number): void {
+		track.style.transform = `translate3d(${x}px, 0, 0)`
+	}
+
+	function set_transition(ms: number): void {
+		track.style.transition = `transform ${ms}ms ${easing}`
+	}
+
+	/** Animation duration, honouring reduced motion. */
+	function animated(): number {
+		return reduced ? 0 : duration
+	}
+
+	/**
+	 * Move the track to the current slide.
+	 * `after_jump` defers to the next frame so the browser commits a transition-less
+	 * repositioning first, then animates onward — otherwise the jump itself animates.
+	 */
+	function render(after_jump = false): void {
+		if (!after_jump) {
+			set_transition(animated())
+			translate(offset_for(index))
+			return
+		}
+
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => {
+				if (destroyed) return
+				set_transition(animated())
+				translate(offset_for(index))
+			})
+		)
+	}
+
+	/** Reposition without animating, e.g. after a resize or a slide being added. */
+	function render_now(): void {
+		set_transition(0)
+		translate(offset_for(index))
+		requestAnimationFrame(() => {
+			if (!destroyed) set_transition(animated())
+		})
+	}
+
+	/* Markup */
+
+	function decorate(slide: HTMLElement, position: number): void {
+		slide.style.flex = FLEX
+		slide.setAttribute('role', 'group')
+		slide.setAttribute('aria-roledescription', 'slide')
+		slide.setAttribute('aria-label', `${position + 1} of ${slides.length}`)
+	}
+
+	function strip(slide: HTMLElement): void {
+		slide.style.removeProperty('flex')
+		slide.removeAttribute('role')
+		slide.removeAttribute('aria-roledescription')
+		slide.removeAttribute('aria-label')
+	}
+
+	/** Duplicate a slide for looping, keeping it out of the accessibility tree and the tab order. */
+	function clone(slide: HTMLElement): HTMLElement {
+		const copy = slide.cloneNode(true) as HTMLElement
+
+		copy.removeAttribute('id')
+		copy.removeAttribute('aria-label')
+		copy.setAttribute('aria-hidden', 'true')
+		copy.setAttribute('inert', '')
+		copy.setAttribute('data-slider-clone', '')
+		for (const el of copy.querySelectorAll('[id]')) el.removeAttribute('id')
+
+		return copy
+	}
+
+	/** Lay out the track. Clones are recreated from scratch, so this is safe to re-run. */
+	function build(): void {
+		slides.forEach(decorate)
+
+		const content = loop
+			? [...slides.slice(-pages).map(clone), ...slides, ...slides.slice(0, pages).map(clone)]
+			: slides
+
+		track.replaceChildren(...content)
+		normalise()
+		render_now()
+	}
+
+	function normalise(): void {
+		index = clamp(index, 0, loop ? Math.max(0, slides.length - 1) : max_index())
+	}
+
+	/* Navigation */
+
+	function emit(type: string, detail: Record<string, unknown>): void {
+		node.dispatchEvent(new CustomEvent(type, { detail }))
+	}
+
+	function changed(previous: number): void {
+		emit('sliderchange', { index, previous, per_page: pages })
+	}
+
+	function next(steps?: number): void {
+		if (slides.length <= pages) return
+
+		const count = to_count(steps)
+		const previous = index
+		let jumped = false
+
+		if (loop && index + count > slides.length - pages) {
+			// Land on the trailing clones without animating, then animate on to the real slide.
+			const mirror = index - slides.length
+			set_transition(0)
+			translate((rtl ? 1 : -1) * (mirror + pages) * (width / pages) + delta)
+			index = mirror + count
+			jumped = true
+		} else if (loop) {
+			index += count
+		} else {
+			index = clamp(index + count, 0, max_index())
+		}
+
+		if (index === previous) return
+		render(jumped)
+		changed(previous)
+	}
+
+	function prev(steps?: number): void {
+		if (slides.length <= pages) return
+
+		const count = to_count(steps)
+		const previous = index
+		let jumped = false
+
+		if (loop && index - count < 0) {
+			const mirror = index + slides.length
+			set_transition(0)
+			translate((rtl ? 1 : -1) * (mirror + pages) * (width / pages) + delta)
+			index = mirror - count
+			jumped = true
+		} else if (loop) {
+			index -= count
+		} else {
+			index = clamp(index - count, 0, max_index())
+		}
+
+		if (index === previous) return
+		render(jumped)
+		changed(previous)
+	}
+
+	function go_to(value: number): void {
+		if (slides.length <= pages) return
+
+		const previous = index
+		index = loop ? wrap(value) : clamp(value, 0, max_index())
+
+		if (index === previous) return
+		render()
+		changed(previous)
+	}
+
+	/* Dragging */
+
+	function on_down(event: PointerEvent): void {
+		if (!draggable || event.button !== 0 || pointer_id !== null) return
+		if (event.target instanceof Element && event.target.closest(IGNORE)) return
+
+		pointer_id = event.pointerId
+		start_x = event.clientX
+		start_y = event.clientY
+		delta = 0
+		axis = null
+
+		node.setPointerCapture?.(event.pointerId)
+		stop()
+	}
+
+	function on_move(event: PointerEvent): void {
+		if (pointer_id !== event.pointerId) return
+
+		const dx = event.clientX - start_x
+		const dy = event.clientY - start_y
+
+		if (axis === null) {
+			if (Math.abs(dx) < AXIS_SLOP && Math.abs(dy) < AXIS_SLOP) return
+			axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+			if (axis === 'x') {
+				node.style.cursor = 'grabbing'
+				node.style.userSelect = 'none'
+			}
+		}
+
+		if (axis !== 'x') return
+
+		delta = dx
+		set_transition(0)
+		translate(offset_for(index) + delta)
+	}
+
+	function on_up(event: PointerEvent): void {
+		if (pointer_id !== event.pointerId) return
+
+		release(event.pointerId)
+
+		if (axis === 'x') {
+			if (Math.abs(delta) > CLICK_SLOP) swallow_click()
+			settle()
+		}
+
+		delta = 0
+		axis = null
+		start()
+	}
+
+	function on_cancel(event: PointerEvent): void {
+		if (pointer_id !== event.pointerId) return
+
+		release(event.pointerId)
+		delta = 0
+		axis = null
+		render()
+		start()
+	}
+
+	function release(id: number): void {
+		node.releasePointerCapture?.(id)
+		pointer_id = null
+		node.style.cursor = draggable ? 'grab' : ''
+		node.style.removeProperty('user-select')
+	}
+
+	/** Decide where a finished drag lands. */
+	function settle(): void {
+		const movement = (rtl ? -1 : 1) * delta
+		const distance = Math.abs(movement)
+		const enough = distance > threshold && slides.length > pages
+		const count = multiple_drag ? Math.max(1, Math.ceil(distance / (width / pages))) : 1
+
+		if (enough && movement > 0) prev(count)
+		else if (enough && movement < 0) next(count)
+		else render()
+	}
+
+	/** Stop the click that follows a drag, so dragging a link doesn't navigate. */
+	function swallow_click(): void {
+		const block = (event: MouseEvent) => {
+			event.preventDefault()
+			event.stopPropagation()
+		}
+
+		node.addEventListener('click', block, { capture: true, once: true })
+		setTimeout(() => node.removeEventListener('click', block, true))
+	}
+
+	/* Keyboard */
+
+	function on_key(event: KeyboardEvent): void {
+		const forward = rtl ? 'ArrowLeft' : 'ArrowRight'
+		const back = rtl ? 'ArrowRight' : 'ArrowLeft'
+
+		if (event.key === forward) next()
+		else if (event.key === back) prev()
+		else if (event.key === 'Home') go_to(0)
+		else if (event.key === 'End') go_to(loop ? slides.length - 1 : max_index())
+		else return
+
+		event.preventDefault()
+	}
+
+	/* Autoplay */
+
+	function start(): void {
+		if (!autoplay || reduced || !wants_play || timer !== undefined || destroyed) return
+
+		timer = setTimeout(() => {
+			timer = undefined
+			next()
+			start()
+		}, autoplay)
+	}
+
+	function stop(): void {
+		clearTimeout(timer)
+		timer = undefined
+	}
+
+	function play(): void {
+		wants_play = true
+		start()
+	}
+
+	function pause(): void {
+		wants_play = false
+		stop()
+	}
+
+	function on_visibility(): void {
+		if (document.hidden) stop()
+		else start()
+	}
+
+	function on_motion_change(): void {
+		reduced = motion?.matches ?? false
+		if (reduced) stop()
+		else start()
+		set_transition(animated())
+	}
+
+	/* Measurement */
+
+	function measure(): void {
+		const previous_pages = pages
+		pages = resolve_pages()
+		width = track.clientWidth
+
+		if (pages !== previous_pages) {
+			node.style.setProperty('--slider-per-page', String(pages))
+			// Looping clones the leading and trailing `pages` slides, so their count changes too.
+			if (loop) return build()
+		}
+
+		normalise()
+		render_now()
+	}
+
+	const observer = new ResizeObserver(measure)
+
+	/* Mutation */
+
+	function insert(item: HTMLElement, position: number): void {
+		if (position < 0 || position > slides.length) throw new Error(`slider: cannot insert at index ${position}`)
+		if (slides.includes(item)) throw new Error('slider: that slide is already in the slider')
+
+		if (position <= index && index > 0) index += 1
+		slides.splice(position, 0, item)
+		build()
+	}
+
+	function remove(position: number): void {
+		if (position < 0 || position >= slides.length) throw new Error(`slider: no slide at index ${position}`)
+
+		const [gone] = slides.splice(position, 1)
+		strip(gone)
+		gone.remove()
+
+		// Shift back when a slide before the current one, or the last visible one, disappears.
+		if (position < index || index + pages - 1 === position) index -= 1
+		build()
+	}
+
+	function update(): void {
+		measure()
+	}
+
+	function destroy(): void {
+		if (destroyed) return
+		destroyed = true
+
+		stop()
+		observer.disconnect()
+		motion?.removeEventListener('change', on_motion_change)
+		document.removeEventListener('visibilitychange', on_visibility)
+		node.removeEventListener('pointerdown', on_down)
+		node.removeEventListener('pointermove', on_move)
+		node.removeEventListener('pointerup', on_up)
+		node.removeEventListener('pointercancel', on_cancel)
+		node.removeEventListener('keydown', on_key)
+
+		slides.forEach(strip)
+		node.replaceChildren(...slides)
+
+		for (const property of ['overflow', 'touch-action', 'cursor', 'user-select', '--slider-per-page']) {
+			node.style.removeProperty(property)
+		}
+		for (const attribute of ['role', 'aria-roledescription', 'aria-label']) {
+			node.removeAttribute(attribute)
+		}
+		if (keyboard) node.removeAttribute('tabindex')
+
+		emit('sliderdestroy', {})
+	}
+
+	/* Init */
+
+	node.style.overflow = 'hidden'
+	node.style.touchAction = 'pan-y'
+	node.style.setProperty('--slider-per-page', String(pages))
+	if (draggable) node.style.cursor = 'grab'
+	if (rtl) track.style.direction = 'rtl'
+
+	node.setAttribute('role', 'region')
+	node.setAttribute('aria-roledescription', 'carousel')
+	node.setAttribute('aria-label', label)
+	if (keyboard) node.setAttribute('tabindex', '0')
+	// An auto-rotating carousel must not announce every change; a manual one should.
+	if (!autoplay) track.setAttribute('aria-live', 'polite')
+
+	track.style.display = 'flex'
+	track.style.willChange = 'transform'
+	node.replaceChildren(track)
+	build()
+	width = track.clientWidth
+	translate(offset_for(index))
+
+	node.addEventListener('pointerdown', on_down)
+	node.addEventListener('pointermove', on_move)
+	node.addEventListener('pointerup', on_up)
+	node.addEventListener('pointercancel', on_cancel)
+	if (keyboard) node.addEventListener('keydown', on_key)
+	document.addEventListener('visibilitychange', on_visibility)
+	motion?.addEventListener('change', on_motion_change)
+	observer.observe(node)
+	start()
+
+	// Deferred so listeners attached straight after this call still see it.
+	queueMicrotask(() => {
+		if (!destroyed) emit('sliderinit', { index, per_page: pages, length: slides.length })
+	})
+
+	return {
+		get index() {
+			return index
+		},
+		get length() {
+			return slides.length
+		},
+		get per_page() {
+			return pages
+		},
+		next,
+		prev,
+		go_to,
+		insert,
+		remove,
+		prepend: item => insert(item, 0),
+		append: item => insert(item, slides.length),
+		play,
+		pause,
+		update,
+		destroy
+	}
+}

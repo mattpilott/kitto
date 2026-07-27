@@ -16,6 +16,8 @@ export { format_time } from './date/format_time/index.js'
 export { cookie } from './dom/cookie/index.js'
 export { gen_element } from './dom/gen_element/index.js'
 export { gen_element as genElement } from './dom/gen_element/index.js'
+export { slider } from './dom/slider/index.js'
+export type { Slider, SliderOptions } from './dom/slider/index.js'
 
 // Function modules
 export { throttle } from './function/throttle/index.js'

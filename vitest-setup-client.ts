@@ -15,4 +15,17 @@ Object.defineProperty(window, 'matchMedia', {
 	}))
 })
 
+// jsdom implements neither ResizeObserver nor pointer capture, both of which the slider uses
+Object.defineProperty(window, 'ResizeObserver', {
+	writable: true,
+	value: class {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+})
+
+Element.prototype.setPointerCapture ??= function () {}
+Element.prototype.releasePointerCapture ??= function () {}
+
 // add more mocks here if you need them
