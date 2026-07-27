@@ -22,6 +22,11 @@ import { clamp } from '../../number/clamp/index.js'
  * The element is styled with `overflow: hidden` and `touch-action: pan-y`, so vertical
  * page scrolling passes through a horizontal drag untouched.
  *
+ * Horizontal wheel and trackpad gestures move the track too, settling on the nearest slide
+ * once they stop. Only gestures that are more horizontal than vertical are claimed, so a
+ * mouse wheel still scrolls the page; those that are claimed are cancelled, which keeps a
+ * two-finger swipe from being read as browser back-navigation.
+ *
  * @example
  * ```ts
  * import { slider } from 'kitto'
@@ -52,6 +57,9 @@ const AXIS_SLOP = 5
 /** Movement in px past which the click following a drag is swallowed. */
 const CLICK_SLOP = 5
 
+/** Idle time in ms after the last wheel event before the gesture counts as finished. */
+const WHEEL_END = 120
+
 /**
  * Coerce a slide count. Guards the two ways a bad value arrives: passing `next`/`prev`
  * straight to an event listener, which supplies the event, and a drag measured against a
@@ -72,6 +80,8 @@ export interface SliderOptions {
 	easing?: string
 	/** Allow pointer dragging. Default `true`. */
 	draggable?: boolean
+	/** Move with horizontal wheel and trackpad gestures. Default `true`. */
+	wheel?: boolean
 	/** Let one long drag advance more than one slide. Default `true`. */
 	multiple_drag?: boolean
 	/** Drag distance in px required to change slide. Default `20`. */
@@ -140,6 +150,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		duration = 200,
 		easing = 'ease-out',
 		draggable = true,
+		wheel = true,
 		multiple_drag = true,
 		threshold = 20,
 		loop = false,
@@ -174,6 +185,9 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	let start_y = 0
 	let delta = 0
 	let axis: 'x' | 'y' | null = null
+
+	// A wheel gesture has no release to settle on, so it is settled once the events stop.
+	let wheel_timer: ReturnType<typeof setTimeout> | undefined
 
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let wants_play = autoplay > 0
@@ -434,16 +448,27 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		node.style.removeProperty('user-select')
 	}
 
-	/** Decide where a finished drag lands. */
-	function settle(): void {
+	/**
+	 * Decide where a finished gesture lands. A drag rounds away from its start, so a short
+	 * flick still advances; a wheel gesture snaps to whichever slide it came to rest nearest,
+	 * the way a scroll container with scroll snapping would.
+	 */
+	function settle(snap: 'away' | 'nearest' = 'away'): void {
 		const movement = (rtl ? -1 : 1) * delta
 		const distance = Math.abs(movement)
-		const enough = distance > threshold && slides.length > pages
-		const count = multiple_drag ? Math.max(1, Math.ceil(distance / (width / pages))) : 1
+		const travelled = distance / (width / pages)
+		const steps = snap === 'nearest' ? Math.round(travelled) : Math.ceil(travelled)
+		const count = multiple_drag ? steps : Math.min(steps, 1)
+		const previous = index
 
-		if (enough && movement > 0) prev(count)
-		else if (enough && movement < 0) next(count)
-		else render()
+		if (distance > threshold && count > 0) {
+			if (movement > 0) prev(count)
+			else next(count)
+		}
+
+		// `prev` and `next` return without rendering when the index cannot move any further,
+		// which would strand the track wherever the gesture left it.
+		if (index === previous) render()
 	}
 
 	/** Stop the click that follows a drag, so dragging a link doesn't navigate. */
@@ -455,6 +480,40 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 
 		node.addEventListener('click', block, { capture: true, once: true })
 		setTimeout(() => node.removeEventListener('click', block, true))
+	}
+
+	/* Wheel */
+
+	/** Hold a wheel gesture inside the track, which unlike a drag has no natural limit. */
+	function bound(value: number): number {
+		if (loop) return value
+
+		const span = (slides.length - pages) * (width / pages)
+		const offset = offset_for(index)
+
+		return rtl ? clamp(value, -offset, span - offset) : clamp(value, -span - offset, -offset)
+	}
+
+	function on_wheel(event: WheelEvent): void {
+		// Vertical intent belongs to the page, and a drag in progress already owns the track.
+		if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || pointer_id !== null) return
+		if (slides.length <= pages) return
+
+		// Also stops the browser reading the gesture as a back-navigation swipe.
+		event.preventDefault()
+		stop()
+
+		delta = bound(delta - event.deltaX)
+		set_transition(0)
+		translate(offset_for(index) + delta)
+
+		clearTimeout(wheel_timer)
+		wheel_timer = setTimeout(() => {
+			wheel_timer = undefined
+			settle('nearest')
+			delta = 0
+			start()
+		}, WHEEL_END)
 	}
 
 	/* Keyboard */
@@ -562,6 +621,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		destroyed = true
 
 		stop()
+		clearTimeout(wheel_timer)
 		observer.disconnect()
 		motion?.removeEventListener('change', on_motion_change)
 		document.removeEventListener('visibilitychange', on_visibility)
@@ -569,6 +629,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		node.removeEventListener('pointermove', on_move)
 		node.removeEventListener('pointerup', on_up)
 		node.removeEventListener('pointercancel', on_cancel)
+		node.removeEventListener('wheel', on_wheel)
 		node.removeEventListener('keydown', on_key)
 
 		slides.forEach(strip)
@@ -611,6 +672,8 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	node.addEventListener('pointermove', on_move)
 	node.addEventListener('pointerup', on_up)
 	node.addEventListener('pointercancel', on_cancel)
+	// Not passive: a horizontal gesture has to be preventable to stay out of the page's hands.
+	if (wheel) node.addEventListener('wheel', on_wheel, { passive: false })
 	if (keyboard) node.addEventListener('keydown', on_key)
 	document.addEventListener('visibilitychange', on_visibility)
 	motion?.addEventListener('change', on_motion_change)

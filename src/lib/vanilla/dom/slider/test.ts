@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { slider, type SliderOptions } from './index.js'
 
 const WIDTH = 600
@@ -106,6 +106,17 @@ function set_hidden(hidden: boolean) {
 
 function key(el: HTMLElement, name: string) {
 	el.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }))
+}
+
+function wheel(el: HTMLElement, x: number, y = 0) {
+	const event = new WheelEvent('wheel', { deltaX: x, deltaY: y, bubbles: true, cancelable: true })
+	el.dispatchEvent(event)
+	return event
+}
+
+/** Run past the idle window that ends a wheel gesture, so it settles. */
+function settle_wheel() {
+	vi.advanceTimersByTime(200)
 }
 
 // The vanilla suite is picked up by both the jsdom and node vitest projects; only the former can run it.
@@ -647,6 +658,138 @@ describe.skipIf(typeof window === 'undefined')('slider', () => {
 
 			expect(instance.index).toBe(0)
 			expect(el.style.cursor).toBe('')
+		})
+	})
+
+	describe('wheel', () => {
+		beforeEach(() => vi.useFakeTimers())
+
+		it('advances on a horizontal gesture', () => {
+			const { el, instance } = setup(5)
+
+			wheel(el, 400)
+			settle_wheel()
+
+			expect(instance.index).toBe(1)
+		})
+
+		it('goes back on the opposite gesture', () => {
+			const { el, instance } = setup(5, { start_index: 2 })
+
+			wheel(el, -400)
+			settle_wheel()
+
+			expect(instance.index).toBe(1)
+		})
+
+		it('follows the gesture before it settles', () => {
+			const { el, track } = setup(5)
+
+			wheel(el, 50)
+
+			expect(track.style.transform).toBe('translate3d(-50px, 0, 0)')
+			expect(track.style.transition).toBe('transform 0ms ease-out')
+		})
+
+		it('accumulates events within one gesture', () => {
+			const { el, track, instance } = setup(5)
+
+			wheel(el, 200)
+			wheel(el, 200)
+			expect(track.style.transform).toBe('translate3d(-400px, 0, 0)')
+
+			settle_wheel()
+			expect(instance.index).toBe(1)
+		})
+
+		it('settles on the nearest slide rather than the next one', () => {
+			const { el, instance } = setup(5)
+
+			// A third of a slide: a drag this size would advance, a scroll should fall back.
+			wheel(el, 200)
+			settle_wheel()
+
+			expect(instance.index).toBe(0)
+		})
+
+		it('returns the track to the slide it settles on', () => {
+			const { el, track } = setup(5)
+
+			wheel(el, 200)
+			settle_wheel()
+
+			expect(track.style.transform).toBe('translate3d(0px, 0, 0)')
+		})
+
+		it('leaves vertical gestures to the page', () => {
+			const { el, instance, track } = setup(5)
+
+			const event = wheel(el, 0, 300)
+			settle_wheel()
+
+			expect(event.defaultPrevented).toBe(false)
+			expect(instance.index).toBe(0)
+			expect(track.style.transform).toBe('translate3d(0px, 0, 0)')
+		})
+
+		it('claims horizontal gestures so they cannot navigate the browser back', () => {
+			const { el } = setup(5)
+
+			expect(wheel(el, 120).defaultPrevented).toBe(true)
+		})
+
+		it('does not run beyond the last slide', () => {
+			const { el, instance, track } = setup(5)
+
+			wheel(el, 100_000)
+			expect(track.style.transform).toBe('translate3d(-2400px, 0, 0)')
+
+			settle_wheel()
+			expect(instance.index).toBe(4)
+		})
+
+		it('does not run beyond the first slide', () => {
+			const { el, instance, track } = setup(5)
+
+			wheel(el, -100_000)
+			expect(track.style.transform).toBe('translate3d(0px, 0, 0)')
+
+			settle_wheel()
+			expect(instance.index).toBe(0)
+		})
+
+		it('ignores a wheel event while a drag is in progress', () => {
+			const { el, track } = setup(5)
+
+			pointer(el, 'pointerdown', 0)
+			pointer(el, 'pointermove', -50)
+			wheel(el, 400)
+
+			expect(track.style.transform).toBe('translate3d(-50px, 0, 0)')
+		})
+
+		it('does nothing when every slide is already visible', () => {
+			const { el } = setup(2, { per_page: 2 })
+
+			expect(wheel(el, 400).defaultPrevented).toBe(false)
+		})
+
+		it('does not respond when wheel is off', () => {
+			const { el, instance } = setup(5, { wheel: false })
+
+			const event = wheel(el, 400)
+			settle_wheel()
+
+			expect(event.defaultPrevented).toBe(false)
+			expect(instance.index).toBe(0)
+		})
+
+		it('stops responding once destroyed', () => {
+			const { el, instance } = setup(5)
+
+			instance.destroy()
+
+			expect(wheel(el, 400).defaultPrevented).toBe(false)
 		})
 	})
 
