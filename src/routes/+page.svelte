@@ -9,6 +9,10 @@
 	const basic = slider({ loop: true, autoplay: 4000, label: 'Looping showcase' })
 	const responsive = slider({ per_page: { 0: 1, 640: 2, 1024: 3 }, label: 'Responsive reel' })
 	const editable = slider({ per_page: 2, label: 'Editable reel' })
+	const mixed = slider({ per_page: 'auto', loop: true, label: 'Mixed width reel' })
+
+	/** Widths for the auto reel, in the order they appear. */
+	const mixed_widths = [12, 24, 8, 30, 16, 20]
 
 	let added = $state(0)
 
@@ -110,6 +114,26 @@
 			Remove current
 		</button>
 		<span>index {editable.index} · length {editable.length}</span>
+	</div>
+</section>
+
+<section>
+	<h2>Mixed widths — <code>per_page: 'auto'</code>, looping</h2>
+	<p>
+		Every slide keeps the width its own CSS gives it, so the track is measured rather than divided up. Dragging
+		and scrolling should settle on whichever slide the gesture actually reached, wide or narrow.
+	</p>
+
+	<div class="reel" {@attach mixed.attach}>
+		{#each mixed_widths as w, i (i)}
+			<div class="slide" style="--h: {i * 45}; width: {w}rem"><span>{w}rem</span></div>
+		{/each}
+	</div>
+
+	<div class="controls">
+		<button onclick={() => mixed.prev()}>Prev</button>
+		<button onclick={() => mixed.next()}>Next</button>
+		<span>index {mixed.index} · max {mixed.max} · length {mixed.length}</span>
 	</div>
 </section>
 

@@ -24,6 +24,36 @@ function mount(count = 5, options: SliderOptions = {}) {
 	return { el, reel, teardown }
 }
 
+/**
+ * Swap in a ResizeObserver a test can drive. The setup file's stub never fires, and jsdom has
+ * no layout to fire it from, so the resize path would otherwise never run.
+ */
+function observing() {
+	const callbacks: Array<() => void> = []
+	const original = window.ResizeObserver
+
+	window.ResizeObserver = class {
+		constructor(callback: () => void) {
+			callbacks.push(callback)
+		}
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	} as unknown as typeof ResizeObserver
+
+	return {
+		/** Resize the viewport and let the observer react. */
+		to(width: number) {
+			window.innerWidth = width
+			for (const callback of callbacks) callback()
+		},
+		restore() {
+			window.ResizeObserver = original
+			window.innerWidth = 1024
+		}
+	}
+}
+
 /** Record every value an effect sees, so reactivity can be asserted rather than assumed. */
 function track<T>(read: () => T) {
 	const seen: T[] = []
@@ -110,6 +140,22 @@ describe('slider controller', () => {
 			stop()
 		})
 
+		it('picks up a resize that moves nothing but the geometry', () => {
+			const observer = observing()
+			const { reel } = mount(9, { per_page: { 0: 1, 1024: 3 } })
+			const { seen, stop } = track(() => reel.per_page)
+
+			// Driven through the observer, so this only works if sliderresize is wired up
+			observer.to(500)
+			flushSync()
+
+			expect(seen).toEqual([3, 1])
+			expect(reel.max).toBe(8)
+
+			stop()
+			observer.restore()
+		})
+
 		it('does not re-run when the index is unchanged', () => {
 			const { reel } = mount(5)
 			const { seen, stop } = track(() => reel.index)
@@ -159,6 +205,21 @@ describe('slider controller', () => {
 			const { reel } = mount(2, { per_page: 2 })
 
 			expect(reel.at_start).toBe(true)
+			expect(reel.at_end).toBe(true)
+		})
+
+		it('reports the reachable maximum', () => {
+			expect(mount(5, { per_page: 2 }).reel.max).toBe(3)
+			expect(mount(5, { per_page: 2, pad: true }).reel.max).toBe(4)
+		})
+
+		it('holds off at_end until the last slide when padding', () => {
+			const { reel } = mount(5, { per_page: 2, pad: true })
+
+			reel.go_to(3)
+			expect(reel.at_end).toBe(false)
+
+			reel.go_to(4)
 			expect(reel.at_end).toBe(true)
 		})
 	})

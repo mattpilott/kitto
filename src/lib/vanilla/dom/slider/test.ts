@@ -350,6 +350,68 @@ describe.skipIf(typeof window === 'undefined')('slider', () => {
 		})
 	})
 
+	describe('pad', () => {
+		it('lets the last slide reach the leading edge', () => {
+			const { instance } = setup(5, { per_page: 2, pad: true })
+
+			instance.go_to(4)
+
+			expect(instance.index).toBe(4)
+		})
+
+		it('stops on a full page without it', () => {
+			const { instance } = setup(5, { per_page: 2 })
+
+			instance.go_to(4)
+
+			expect(instance.index).toBe(3)
+		})
+
+		it('reports the reachable maximum either way', () => {
+			expect(setup(5, { per_page: 2, pad: true }).instance.max).toBe(4)
+			expect(setup(5, { per_page: 2 }).instance.max).toBe(3)
+		})
+
+		it('gives every slide a resting position when per_page is fractional', () => {
+			const { instance } = setup(5, { per_page: 2.5, pad: true })
+
+			expect(instance.max).toBe(4)
+			// Without padding the last two slides would share the 2.5 resting position.
+			expect(setup(5, { per_page: 2.5 }).instance.max).toBe(2.5)
+		})
+
+		it('runs the track on into the empty space', () => {
+			const { instance, track } = setup(5, { per_page: 2, pad: true })
+
+			instance.go_to(4)
+
+			expect(track.style.transform).toBe('translate3d(-1200px, 0, 0)')
+		})
+
+		it('sends End to the last slide', () => {
+			const { el, instance } = setup(5, { per_page: 2, pad: true })
+
+			key(el, 'End')
+
+			expect(instance.index).toBe(4)
+		})
+
+		it('changes nothing while looping, which already reaches every slide', () => {
+			const { instance } = setup(5, { per_page: 2, pad: true, loop: true })
+
+			expect(instance.max).toBe(4)
+		})
+
+		it('stays put when every slide is already visible', () => {
+			const { instance } = setup(2, { per_page: 2, pad: true })
+
+			instance.next()
+
+			expect(instance.max).toBe(0)
+			expect(instance.index).toBe(0)
+		})
+	})
+
 	describe('resizing', () => {
 		it('re-resolves per_page as the viewport changes', () => {
 			const observer = observing()
@@ -513,6 +575,192 @@ describe.skipIf(typeof window === 'undefined')('slider', () => {
 			const { track } = setup(5, { loop: true })
 
 			expect(track.style.transform).toBe(`translate3d(${-WIDTH}px, 0, 0)`)
+		})
+	})
+
+	describe('auto width', () => {
+		let restore: (() => void) | undefined
+
+		afterEach(() => {
+			restore?.()
+			restore = undefined
+		})
+
+		/**
+		 * Lay the track's children out by hand, since jsdom has no layout engine: each slide is
+		 * as wide as its `data-width`, and they sit end to end from the track's leading edge.
+		 */
+		function measuring(rtl: boolean) {
+			const original = HTMLElement.prototype.getBoundingClientRect
+
+			const box = (left: number, width: number) => ({ left, right: left + width, width }) as DOMRect
+
+			HTMLElement.prototype.getBoundingClientRect = function () {
+				// Only the track lays anything out; everything else is the track itself or outside it.
+				if (this.parentElement?.style.display !== 'flex') return box(0, WIDTH)
+
+				const own = Number(this.dataset.width ?? 0)
+				let before = 0
+				let total = 0
+
+				for (const child of this.parentElement.children) {
+					if (child === this) before = total
+					total += Number((child as HTMLElement).dataset.width ?? 0)
+				}
+
+				return rtl ? box(WIDTH - before - own, own) : box(before, own)
+			}
+
+			return () => {
+				HTMLElement.prototype.getBoundingClientRect = original
+			}
+		}
+
+		function reel(widths: number[], options: SliderOptions = {}) {
+			restore = measuring(!!options.rtl)
+
+			const el = document.createElement('div')
+
+			widths.forEach((width, i) => {
+				const slide = document.createElement('div')
+				slide.dataset.width = String(width)
+				slide.textContent = `slide ${i}`
+				el.append(slide)
+			})
+
+			document.body.append(el)
+			const instance = slider(el, { per_page: 'auto', ...options })
+
+			return { el, instance, track: el.firstElementChild as HTMLElement }
+		}
+
+		it('leaves the sizing to CSS', () => {
+			const { el, track } = reel([200, 400])
+
+			expect((track.children[0] as HTMLElement).style.flex).toBe('0 0 auto')
+			expect(el.style.getPropertyValue('--slider-per-page')).toBe('')
+		})
+
+		it('reports a single page, whatever the widths', () => {
+			expect(reel([200, 400, 300, 500]).instance.per_page).toBe(1)
+		})
+
+		it('travels by each slide own width', () => {
+			const { instance, track } = reel([200, 400, 300, 500])
+
+			instance.next()
+			expect(track.style.transform).toBe('translate3d(-200px, 0, 0)')
+
+			instance.next()
+			expect(track.style.transform).toBe('translate3d(-600px, 0, 0)')
+		})
+
+		it('stops once the remaining slides fill the track', () => {
+			// From slide 2 the last two make up the 600px track exactly
+			const { instance } = reel([500, 100, 200, 400])
+
+			instance.next(99)
+
+			expect(instance.max).toBe(2)
+			expect(instance.index).toBe(2)
+		})
+
+		it('lets every slide lead when padding', () => {
+			const { instance } = reel([500, 100, 200, 400], { pad: true })
+
+			instance.next(99)
+
+			expect(instance.index).toBe(3)
+		})
+
+		it('does nothing when every slide is already visible', () => {
+			const { instance } = reel([200, 200])
+
+			instance.next()
+
+			expect(instance.max).toBe(0)
+			expect(instance.index).toBe(0)
+		})
+
+		it('settles a drag on the slides it actually crossed', () => {
+			const { el, instance } = reel([400, 100, 300, 600])
+
+			// Past the wide first slide and the narrow second one, which even widths would miss
+			drag(el, -450)
+
+			expect(instance.index).toBe(2)
+		})
+
+		it('measures the threshold for a wheel gesture against the slide under it', () => {
+			vi.useFakeTimers()
+			const { el, instance } = reel([400, 100, 300, 600])
+
+			wheel(el, 250)
+			settle_wheel()
+			expect(instance.index).toBe(1)
+
+			wheel(el, -150)
+			settle_wheel()
+			expect(instance.index).toBe(1)
+		})
+
+		it('holds a wheel gesture at the last resting position', () => {
+			vi.useFakeTimers()
+			const { el, track } = reel([300, 300, 300, 300])
+
+			wheel(el, 100_000)
+
+			expect(track.style.transform).toBe('translate3d(-600px, 0, 0)')
+		})
+
+		it('clones enough slides to cover the track when looping', () => {
+			// Three 200px slides are needed to cover the 600px track at either end
+			const { track } = reel([200, 200, 200, 200], { loop: true })
+
+			expect(track.querySelectorAll('[data-slider-clone]')).toHaveLength(6)
+			expect(track.style.transform).toBe('translate3d(-600px, 0, 0)')
+		})
+
+		it('wraps past the end on a track of mixed widths', () => {
+			const { instance } = reel([200, 400, 200, 400], { loop: true, start_index: 3 })
+
+			instance.next()
+
+			expect(instance.index).toBe(0)
+		})
+
+		it('lays out in the other direction when rtl', () => {
+			const { instance, track } = reel([200, 400, 300, 500], { rtl: true })
+
+			instance.next()
+
+			expect(track.style.transform).toBe('translate3d(200px, 0, 0)')
+		})
+
+		it('copes with an empty slider', () => {
+			const { instance, track } = reel([], { loop: true })
+
+			instance.next()
+
+			expect(instance.length).toBe(0)
+			expect(track.style.transform).toBe('translate3d(0px, 0, 0)')
+		})
+
+		it('re-measures when the slides change size', () => {
+			const observer = observing()
+			const { el, track, instance } = reel([300, 300, 300, 300])
+			const listener = vi.fn()
+			el.addEventListener('sliderresize', listener)
+
+			expect(instance.max).toBe(2)
+
+			for (const slide of track.children) (slide as HTMLElement).dataset.width = '600'
+			observer.to(1024)
+
+			expect(instance.max).toBe(3)
+			expect(listener).toHaveBeenCalledOnce()
+
+			observer.restore()
 		})
 	})
 

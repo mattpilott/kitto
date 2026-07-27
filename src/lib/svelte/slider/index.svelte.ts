@@ -10,13 +10,14 @@ import { slider as create, type Slider, type SliderOptions } from '../../vanilla
  * hand `attach` to the element holding your slides — the slides stay your markup, so no
  * wrapper component takes them over.
  *
- * `index`, `length`, `per_page`, `at_start` and `at_end` are reactive, so arrows, dots and
- * counters need no event plumbing. Every method is safe to call before the element mounts,
+ * `index`, `length`, `per_page`, `max`, `at_start` and `at_end` are reactive, so arrows, dots
+ * and counters need no event plumbing. Every method is safe to call before the element mounts,
  * where it simply does nothing.
  *
  * Options are read once, when the element mounts. That keeps the attachment free of
  * reactive dependencies, so it never tears the slider down and rebuilds it — vary the
- * visible slide count with a `per_page` breakpoint map rather than reactive state.
+ * visible slide count with a `per_page` breakpoint map rather than reactive state, or hand
+ * sizing to CSS entirely with `per_page: 'auto'`.
  *
  * @param options - Options for the underlying slider
  * @returns A reactive controller
@@ -50,6 +51,8 @@ export interface SliderController {
 	readonly length: number
 	/** Slides currently visible at once. Reactive. */
 	readonly per_page: number
+	/** Highest index the slider can reach. Reactive. */
+	readonly max: number
 	/** Whether the slider cannot go back any further. Always `false` when looping. */
 	readonly at_start: boolean
 	/** Whether the slider cannot advance any further. Always `false` when looping. */
@@ -76,17 +79,22 @@ export interface SliderController {
 	update(): void
 }
 
+/** Slider events carrying state worth mirroring. */
+const EVENTS = ['sliderchange', 'sliderresize'] as const
+
 export function slider(options: SliderOptions = {}): SliderController {
 	let instance: Slider | undefined
 	let index = $state(options.start_index ?? 0)
 	let length = $state(0)
 	let per_page = $state(1)
+	let max = $state(0)
 
 	function sync(): void {
 		if (!instance) return
 		index = instance.index
 		length = instance.length
 		per_page = instance.per_page
+		max = instance.max
 	}
 
 	/** Wrap a method so state stays in sync, and so calls before the element mounts are harmless. */
@@ -101,10 +109,11 @@ export function slider(options: SliderOptions = {}): SliderController {
 	const attach: Attachment<HTMLElement> = node => {
 		instance = create(node, options)
 		sync()
-		node.addEventListener('sliderchange', sync)
+		// A resize can change per_page and the reachable maximum without the index moving.
+		for (const type of EVENTS) node.addEventListener(type, sync)
 
 		return () => {
-			node.removeEventListener('sliderchange', sync)
+			for (const type of EVENTS) node.removeEventListener(type, sync)
 			instance?.destroy()
 			instance = undefined
 		}
@@ -121,11 +130,14 @@ export function slider(options: SliderOptions = {}): SliderController {
 		get per_page() {
 			return per_page
 		},
+		get max() {
+			return max
+		},
 		get at_start() {
 			return !options.loop && index === 0
 		},
 		get at_end() {
-			return !options.loop && index >= length - per_page
+			return !options.loop && index >= max
 		},
 		next: control((slider, count?: number) => slider.next(count)),
 		prev: control((slider, count?: number) => slider.prev(count)),

@@ -11,9 +11,13 @@ import { clamp } from '../../number/clamp/index.js'
  * measurement. Slides are the element's own children — they are never wrapped, so your
  * own CSS keeps working.
  *
+ * Slides normally share the track evenly, `per_page` at a time. Pass `per_page: 'auto'` to
+ * hand sizing back to your CSS instead: every slide keeps the width you give it, wide and
+ * narrow ones sit side by side, and the slider measures them rather than assuming.
+ *
  * State is reported with `CustomEvent`s on the element rather than option callbacks:
- * `sliderinit`, `sliderchange` and `sliderdestroy`. `sliderinit` fires in a microtask,
- * so you can attach listeners immediately after constructing the slider.
+ * `sliderinit`, `sliderchange`, `sliderresize` and `sliderdestroy`. `sliderinit` fires in a
+ * microtask, so you can attach listeners immediately after constructing the slider.
  *
  * Accessible by default: the element becomes a labelled carousel region, slides are
  * announced positionally, looped clones are `inert`, arrow keys navigate, and
@@ -51,6 +55,12 @@ const IGNORE = 'input, textarea, select, button, a[href], [contenteditable], [da
 /** Per-slide sizing. Percentages resolve against the track, so changing the custom property resizes every slide. */
 const FLEX = '0 0 calc(100% / var(--slider-per-page, 1))'
 
+/** Per-slide sizing when the slides bring their own widths. */
+const FLEX_AUTO = '0 0 auto'
+
+/** Sub-pixel slack, so a slide that only just fits is not measured out of the running. */
+const SLACK = 0.5
+
 /** Movement in px before the drag axis is locked. */
 const AXIS_SLOP = 5
 
@@ -61,17 +71,19 @@ const CLICK_SLOP = 5
 const WHEEL_END = 120
 
 /**
- * Coerce a slide count. Guards the two ways a bad value arrives: passing `next`/`prev`
- * straight to an event listener, which supplies the event, and a drag measured against a
- * zero-width container, which divides by zero.
+ * Coerce a slide count, guarding the way a bad value tends to arrive: passing `next` or
+ * `prev` straight to an event listener, which supplies the event.
  */
 function to_count(value: unknown): number {
 	return typeof value === 'number' && Number.isFinite(value) ? value : 1
 }
 
 export interface SliderOptions {
-	/** Slides visible at once. Pass an object to vary it by viewport width, e.g. `{ 0: 1, 640: 2 }`. */
-	per_page?: number | Record<number, number>
+	/**
+	 * Slides visible at once. Pass an object to vary it by viewport width, e.g. `{ 0: 1, 640: 2 }`,
+	 * or `'auto'` to leave each slide at whatever width your CSS gives it. Default `1`.
+	 */
+	per_page?: number | 'auto' | Record<number, number>
 	/** Slide to show first. Default `0`. */
 	start_index?: number
 	/** Transition duration in ms. Default `200`. */
@@ -86,6 +98,12 @@ export interface SliderOptions {
 	multiple_drag?: boolean
 	/** Drag distance in px required to change slide. Default `20`. */
 	threshold?: number
+	/**
+	 * Let the last slide reach the leading edge instead of stopping on a full page, leaving
+	 * empty space after it. Gives every slide a resting position, so one dot per slide is
+	 * reachable when `per_page` shows more than one. Ignored while looping. Default `false`.
+	 */
+	pad?: boolean
 	/** Wrap around at the ends using cloned slides. Default `false`. */
 	loop?: boolean
 	/** Lay the slides out right-to-left. Default `false`. */
@@ -103,8 +121,10 @@ export interface Slider {
 	readonly index: number
 	/** Number of slides. */
 	readonly length: number
-	/** Slides currently visible at once. */
+	/** Slides currently visible at once. Always `1` when `per_page` is `'auto'`. */
 	readonly per_page: number
+	/** Highest index the slider can reach, given `per_page`, `pad` and `loop`. */
+	readonly max: number
 	/** Advance by `count` slides. */
 	next(count?: number): void
 	/** Go back by `count` slides. */
@@ -153,6 +173,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		wheel = true,
 		multiple_drag = true,
 		threshold = 20,
+		pad = false,
 		loop = false,
 		rtl = false,
 		keyboard = true,
@@ -168,15 +189,28 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 					.sort((a, b) => a[0] - b[0])
 			: []
 
+	/** Auto width hands sizing to your CSS, so the slides have to be measured rather than computed. */
+	const auto = per_page === 'auto'
+
 	const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
 	const track = document.createElement('div')
 
 	const slides = [...node.children] as HTMLElement[]
 	let pages = resolve_pages()
 	let width = 0
-	let index = loop ? wrap(start_index) : clamp(start_index, 0, max_index())
+	// Left unclamped: `build` measures the slides before normalising it into range.
+	let index = loop ? wrap(start_index) : start_index
 	let reduced = motion?.matches ?? false
 	let destroyed = false
+
+	// Auto-width geometry, all measured: where each slide's leading edge sits relative to the
+	// first, how long one full run of slides is, and how much room the leading clones take.
+	let positions: number[] = []
+	let extent = 0
+	let lead = 0
+
+	/** Slides duplicated at each end while looping. */
+	let clones = auto ? 1 : pages
 
 	// Drag state. `delta` stays set until the drag has been fully settled, so a clone jump
 	// mid-drag can account for the distance already travelled.
@@ -195,6 +229,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	/* Geometry */
 
 	function resolve_pages(): number {
+		if (auto) return 1
 		if (typeof per_page === 'number') return Math.max(1, per_page)
 
 		let value = 1
@@ -202,8 +237,28 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		return Math.max(1, value)
 	}
 
-	/** Highest index that still fills the viewport. */
+	/** Whether every slide is on screen at once, leaving nowhere to go. */
+	function fits(): boolean {
+		return auto ? extent <= width + SLACK : slides.length <= pages
+	}
+
+	/**
+	 * Highest index the slider can reach. Normally the last page stays full, so the final
+	 * slides share a resting position; `pad` instead lets every slide lead in turn, running
+	 * on into empty space, which is what makes one dot per slide reachable.
+	 */
 	function max_index(): number {
+		if (loop) return Math.max(0, slides.length - 1)
+		if (fits()) return 0
+		if (pad) return slides.length - 1
+
+		if (auto) {
+			// The last slide that still has a full track's worth of slides behind it.
+			let value = 0
+			while (value < slides.length - 1 && extent - positions[value + 1] >= width - SLACK) value++
+			return value
+		}
+
 		return Math.max(0, slides.length - pages)
 	}
 
@@ -213,9 +268,30 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		return total ? ((value % total) + total) % total : 0
 	}
 
+	/**
+	 * Distance from the track's leading edge to a slide. Indices outside the slides address the
+	 * clones on either side, which is where a loop jump lands.
+	 */
+	function ladder(value: number): number {
+		if (!auto) return (loop ? value + pages : value) * (width / pages)
+		if (!slides.length) return 0
+		if (value < 0) return ladder(value + slides.length) - extent
+		if (value >= slides.length) return ladder(value - slides.length) + extent
+
+		return lead + (positions[value] ?? 0)
+	}
+
+	/** How far the track travels to pass one slide. */
+	function span(value: number): number {
+		if (!auto) return width / pages
+
+		const at = wrap(value)
+		return (at === slides.length - 1 ? extent : (positions[at + 1] ?? 0)) - (positions[at] ?? 0)
+	}
+
 	/** Track offset in px for a slide index, accounting for the leading clones and direction. */
 	function offset_for(value: number): number {
-		return (rtl ? 1 : -1) * (loop ? value + pages : value) * (width / pages)
+		return (rtl ? 1 : -1) * ladder(value)
 	}
 
 	function translate(x: number): void {
@@ -264,7 +340,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	/* Markup */
 
 	function decorate(slide: HTMLElement, position: number): void {
-		slide.style.flex = FLEX
+		slide.style.flex = auto ? FLEX_AUTO : FLEX
 		slide.setAttribute('role', 'group')
 		slide.setAttribute('aria-roledescription', 'slide')
 		slide.setAttribute('aria-label', `${position + 1} of ${slides.length}`)
@@ -291,21 +367,87 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		return copy
 	}
 
-	/** Lay out the track. Clones are recreated from scratch, so this is safe to re-run. */
-	function build(): void {
-		slides.forEach(decorate)
-
+	/** Put the slides in the track, wrapped in clones when looping. */
+	function fill(): void {
 		const content = loop
-			? [...slides.slice(-pages).map(clone), ...slides, ...slides.slice(0, pages).map(clone)]
+			? [...slides.slice(-clones).map(clone), ...slides, ...slides.slice(0, clones).map(clone)]
 			: slides
 
 		track.replaceChildren(...content)
+	}
+
+	/** Slides to duplicate at each end while looping — enough of them to cover the track. */
+	function cover(): number {
+		return auto ? Math.max(reach(1), reach(-1)) : pages
+	}
+
+	/** Slides needed from one end of the run to fill the track. */
+	function reach(direction: 1 | -1): number {
+		let count = 0
+
+		for (let total = 0; total < width && count < slides.length; count++) {
+			total += span(direction > 0 ? count : slides.length - 1 - count)
+		}
+
+		return Math.max(1, count)
+	}
+
+	/**
+	 * Measure the slides. Equal-width ones are a ladder the track's own width already describes,
+	 * so only auto-width ones are read back from the DOM. Positions are taken from the track's
+	 * leading edge, which keeps any margin between the slides in the reckoning.
+	 */
+	function layout(): void {
+		if (!auto) return
+
+		const box = track.getBoundingClientRect()
+		const origin = rtl ? box.right : box.left
+		const first = slides[0]
+		const last = slides[slides.length - 1]
+
+		/** The track and its slides carry the same transform, so it cancels out here. */
+		const at = (el: Element): number => {
+			const rect = el.getBoundingClientRect()
+			return rtl ? origin - rect.right : rect.left - origin
+		}
+
+		if (!first || !last) {
+			positions = []
+			extent = 0
+			lead = 0
+			return
+		}
+
+		lead = at(first)
+		positions = slides.map(slide => at(slide) - lead)
+
+		// The first trailing clone marks where the next run begins, so looping measures the gap too.
+		const after = loop ? track.children[clones + slides.length] : undefined
+		extent = after ? at(after) - lead : positions[slides.length - 1] + last.getBoundingClientRect().width
+	}
+
+	/** Lay out the track. Clones are recreated from scratch, so this is safe to re-run. */
+	function build(): void {
+		slides.forEach(decorate)
+		// Equal-width clones can be counted up front; auto-width ones need the slides measured first.
+		if (!auto) clones = pages
+
+		fill()
+		layout()
+
+		const needed = loop ? cover() : clones
+		if (needed !== clones) {
+			clones = needed
+			fill()
+			layout()
+		}
+
 		normalise()
 		render_now()
 	}
 
 	function normalise(): void {
-		index = clamp(index, 0, loop ? Math.max(0, slides.length - 1) : max_index())
+		index = clamp(index, 0, max_index())
 	}
 
 	/* Navigation */
@@ -319,7 +461,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	}
 
 	function next(steps?: number): void {
-		if (slides.length <= pages) return
+		if (fits()) return
 
 		const count = to_count(steps)
 		const previous = index
@@ -329,7 +471,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 			// Land on the trailing clones without animating, then animate on to the real slide.
 			const mirror = index - slides.length
 			set_transition(0)
-			translate((rtl ? 1 : -1) * (mirror + pages) * (width / pages) + delta)
+			translate(offset_for(mirror) + delta)
 			index = mirror + count
 			jumped = true
 		} else if (loop) {
@@ -344,7 +486,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	}
 
 	function prev(steps?: number): void {
-		if (slides.length <= pages) return
+		if (fits()) return
 
 		const count = to_count(steps)
 		const previous = index
@@ -353,7 +495,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		if (loop && index - count < 0) {
 			const mirror = index + slides.length
 			set_transition(0)
-			translate((rtl ? 1 : -1) * (mirror + pages) * (width / pages) + delta)
+			translate(offset_for(mirror) + delta)
 			index = mirror - count
 			jumped = true
 		} else if (loop) {
@@ -368,7 +510,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	}
 
 	function go_to(value: number): void {
-		if (slides.length <= pages) return
+		if (fits()) return
 
 		const previous = index
 		index = loop ? wrap(value) : clamp(value, 0, max_index())
@@ -456,8 +598,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	function settle(snap: 'away' | 'nearest' = 'away'): void {
 		const movement = (rtl ? -1 : 1) * delta
 		const distance = Math.abs(movement)
-		const travelled = distance / (width / pages)
-		const steps = snap === 'nearest' ? Math.round(travelled) : Math.ceil(travelled)
+		const steps = crossed(distance, movement > 0 ? -1 : 1, snap)
 		const count = multiple_drag ? steps : Math.min(steps, 1)
 		const previous = index
 
@@ -469,6 +610,28 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		// `prev` and `next` return without rendering when the index cannot move any further,
 		// which would strand the track wherever the gesture left it.
 		if (index === previous) render()
+	}
+
+	/**
+	 * How many slides a gesture of `distance` px covered, walking out from the current one so
+	 * that slides of different widths each count for the room they actually take.
+	 */
+	function crossed(distance: number, direction: 1 | -1, snap: 'away' | 'nearest'): number {
+		let steps = 0
+		let travelled = 0
+
+		while (steps < slides.length) {
+			const size = span(direction > 0 ? index + steps : index - steps - 1)
+			const left = distance - travelled
+
+			if (!size) break
+			if (left <= size) return steps + (left > (snap === 'nearest' ? size / 2 : 0) ? 1 : 0)
+
+			travelled += size
+			steps++
+		}
+
+		return steps
 	}
 
 	/** Stop the click that follows a drag, so dragging a link doesn't navigate. */
@@ -488,16 +651,16 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	function bound(value: number): number {
 		if (loop) return value
 
-		const span = (slides.length - pages) * (width / pages)
+		const limit = ladder(max_index())
 		const offset = offset_for(index)
 
-		return rtl ? clamp(value, -offset, span - offset) : clamp(value, -span - offset, -offset)
+		return rtl ? clamp(value, -offset, limit - offset) : clamp(value, -limit - offset, -offset)
 	}
 
 	function on_wheel(event: WheelEvent): void {
 		// Vertical intent belongs to the page, and a drag in progress already owns the track.
 		if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || pointer_id !== null) return
-		if (slides.length <= pages) return
+		if (fits()) return
 
 		// Also stops the browser reading the gesture as a back-navigation swipe.
 		event.preventDefault()
@@ -525,7 +688,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		if (event.key === forward) next()
 		else if (event.key === back) prev()
 		else if (event.key === 'Home') go_to(0)
-		else if (event.key === 'End') go_to(loop ? slides.length - 1 : max_index())
+		else if (event.key === 'End') go_to(max_index())
 		else return
 
 		event.preventDefault()
@@ -573,18 +736,27 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	/* Measurement */
 
 	function measure(): void {
-		const previous_pages = pages
+		const before = { pages, index, max: max_index() }
+
 		pages = resolve_pages()
 		width = track.clientWidth
 
-		if (pages !== previous_pages) {
-			node.style.setProperty('--slider-per-page', String(pages))
-			// Looping clones the leading and trailing `pages` slides, so their count changes too.
-			if (loop) return build()
+		if (!auto && pages !== before.pages) node.style.setProperty('--slider-per-page', String(pages))
+
+		layout()
+
+		// Looping covers the track with clones at each end, so a new page count — or, with
+		// auto width, a new track width — changes how many of them are needed.
+		if (loop && cover() !== clones) {
+			build()
+		} else {
+			normalise()
+			render_now()
 		}
 
-		normalise()
-		render_now()
+		if (pages !== before.pages || index !== before.index || max_index() !== before.max) {
+			emit('sliderresize', { index, per_page: pages, max: max_index() })
+		}
 	}
 
 	const observer = new ResizeObserver(measure)
@@ -650,7 +822,7 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 
 	node.style.overflow = 'hidden'
 	node.style.touchAction = 'pan-y'
-	node.style.setProperty('--slider-per-page', String(pages))
+	if (!auto) node.style.setProperty('--slider-per-page', String(pages))
 	if (draggable) node.style.cursor = 'grab'
 	if (rtl) track.style.direction = 'rtl'
 
@@ -664,9 +836,9 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 	track.style.display = 'flex'
 	track.style.willChange = 'transform'
 	node.replaceChildren(track)
-	build()
+	// Measured before the first build, which needs the track's width to place the slides.
 	width = track.clientWidth
-	translate(offset_for(index))
+	build()
 
 	node.addEventListener('pointerdown', on_down)
 	node.addEventListener('pointermove', on_move)
@@ -694,6 +866,9 @@ export function slider(target: HTMLElement | string, options: SliderOptions = {}
 		},
 		get per_page() {
 			return pages
+		},
+		get max() {
+			return max_index()
 		},
 		next,
 		prev,
