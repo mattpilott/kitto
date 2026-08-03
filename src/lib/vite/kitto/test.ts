@@ -103,6 +103,59 @@ describe('kitto plugin', () => {
 		})
 	})
 
+	describe('targets', () => {
+		it('leaves build alone when omitted', () => {
+			const config = config_of(kitto(options))
+			expect(config.build).toBeUndefined()
+			expect(config.css?.lightningcss?.targets).toBeUndefined()
+		})
+
+		it('sets js, css and minify floors from one source', () => {
+			const config = config_of(kitto({ ...options, targets: ['chrome111', 'safari16.4'] }))
+			expect(config.build?.target).toEqual(['chrome111', 'safari16.4'])
+			expect(config.build?.cssTarget).toEqual(['chrome111', 'safari16.4'])
+			expect(config.css?.lightningcss?.targets).toEqual({ chrome: 111 << 16, safari: (16 << 16) | (4 << 8) })
+		})
+
+		it('keeps the visitor alongside the targets', () => {
+			const config = config_of(kitto({ ...options, targets: 'baseline' }))
+			expect(config.css?.lightningcss?.visitor).toBeDefined()
+			expect(config.css?.lightningcss?.targets).toBeDefined()
+		})
+
+		it('tracks baseline widely available', () => {
+			const config = config_of(kitto({ ...options, targets: 'baseline' }))
+			expect(config.build?.target).toEqual(expect.arrayContaining([expect.stringMatching(/^safari\d/)]))
+		})
+
+		it('lets an explicit build.target win', () => {
+			const user = { build: { target: ['chrome99'] } }
+			const config = config_of(kitto({ ...options, targets: 'baseline' }), user)
+			expect(config.build?.target).toEqual(['chrome99'])
+			expect(config.build?.cssTarget).toEqual(['chrome99'])
+		})
+
+		it('lets an explicit cssTarget diverge from build.target', () => {
+			const user = { build: { target: ['chrome111'], cssTarget: ['chrome99'] } }
+			const config = config_of(kitto({ ...options, targets: 'baseline' }), user)
+			expect(config.build?.target).toEqual(['chrome111'])
+			expect(config.build?.cssTarget).toEqual(['chrome99'])
+		})
+
+		it('lets explicit lightningcss targets win', () => {
+			const user = { css: { lightningcss: { targets: { chrome: 99 << 16 } } } }
+			const config = config_of(kitto({ ...options, targets: 'baseline' }), user)
+			expect(config.css?.lightningcss?.targets).toEqual({ chrome: 99 << 16 })
+		})
+
+		it('still sets the minify floor under postcss', () => {
+			const user = { css: { transformer: 'postcss' } } as const
+			const config = config_of(kitto({ ...options, targets: ['chrome111'] }), user)
+			expect(config.css).toBeUndefined()
+			expect(config.build?.cssTarget).toEqual(['chrome111'])
+		})
+	})
+
 	describe('defines', () => {
 		it('bakes name, version, build and environment', () => {
 			const config = config_of(kitto(options), { root: import.meta.dirname + '/../../../..' }, serve)
