@@ -1,6 +1,6 @@
 {
 	"name": "kitto",
-	"version": "1.10.0",
+	"version": "1.10.1",
 	"description": "A unique blend of tree-shakeable items for any web expedition",
 	"keywords": [
 		"svelte",

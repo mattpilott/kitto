@@ -34,7 +34,7 @@ export { gen_id as genID } from './string/gen_id/index.js'
 
 // Utility modules
 export { latch } from './utility/latch/index.js'
-export type { Jar, Latched, LatchOptions, LatchSpec } from './utility/latch/index.js'
+export type { Jar, JarOptions, Latched, LatchOptions, LatchSpec } from './utility/latch/index.js'
 export { query } from './utility/query/index.js'
 export { to_base64 } from './utility/to_base64/index.js'
 export { to_base64 as toBase64 } from './utility/to_base64/index.js'
