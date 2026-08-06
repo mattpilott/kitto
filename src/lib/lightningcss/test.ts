@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { composeVisitors, transform } from 'lightningcss'
 import { breakpoints, fluid, size } from './index.js'
 
-// Vite spreads `css.lightningcss` into its minify pass as well as the transform, so on node
-// the composed visitor sees the css a second time (vitejs/vite#23146). That is only harmless
-// while the visitors are a fixed point — this locks that in.
+// Vite ≤8.2.0 spread `css.lightningcss` into its minify pass as well as the transform, so the
+// composed visitor saw the css twice (vitejs/vite#23146, fixed in 8.2.1). Kept because kitto
+// still supports those versions, and because a visitor that is not a fixed point is a bug in
+// its own right — anything it rewrites should already be plain css by the time it returns.
 describe('visitors are idempotent', () => {
 	const visitor = composeVisitors([breakpoints({ tablet: 1024 }), fluid({ vmax: 1600 }), size])
 

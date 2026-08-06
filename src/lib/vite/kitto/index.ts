@@ -23,10 +23,9 @@ interface Options {
 	/**
 	 * Extra lightningcss visitors, composed after kitto's.
 	 *
-	 * On node these run twice: vite spreads `css.lightningcss` into its minify pass as well as
-	 * the transform, so a visitor must be idempotent — kitto's own are, since they consume
-	 * custom syntax and emit plain css. Under bun they run once, through the sync fallback
-	 * below. Tracked upstream in vitejs/vite#23146.
+	 * Before vite 8.2.1, node ran these twice — the minify pass re-applied whatever was in
+	 * `css.lightningcss` — so a visitor had to be idempotent (vitejs/vite#23146, fixed by
+	 * vitejs/vite#23147). Worth staying idempotent anyway if you support older vite.
 	 */
 	visitors?: Array<Visitor<CustomAtRules>>
 	/**
