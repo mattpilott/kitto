@@ -41,8 +41,9 @@ interface Options {
 	targets?: TargetSpec
 	/** Bake name, version, build and environment into `import.meta.env`. On by default, per key too: `{ name: false }` drops one. */
 	defines?: boolean | { name?: boolean; version?: boolean; build?: boolean; environment?: boolean }
-	/** Serve https when mkcert pems (`<name>.pem` + `<name>-key.pem`) exist in the project root. On by default. */
-	https?: boolean
+	/** Serve https when mkcert pems (`<name>.pem` + `<name>-key.pem`) are found. Pass a
+	 *  path to look outside the project root, e.g. `'../../certs'`. On by default. */
+	https?: boolean | string
 }
 
 /**
@@ -118,6 +119,7 @@ export function kitto(options: Options = {}): Plugin {
 	let command = 'serve'
 	let warn_https = false
 	let foreign_visitor = false
+	let certs_dir = ''
 
 	const plugin: Plugin = {
 		name: 'kitto',
@@ -177,18 +179,21 @@ export function kitto(options: Options = {}): Plugin {
 
 			if (https && user.server?.https === undefined) {
 				// mkcert emits <name>.pem + <name>-key.pem, whatever the domain
-				const key = fs
-					.readdirSync(root)
-					.filter(file => file.endsWith('-key.pem'))
-					.sort()
-					.find(file => fs.existsSync(path.join(root, file.replace('-key.pem', '.pem'))))
+				certs_dir = path.resolve(root, typeof https === 'string' ? https : '.')
+				const key = fs.existsSync(certs_dir)
+					? fs
+							.readdirSync(certs_dir)
+							.filter(file => file.endsWith('-key.pem'))
+							.sort()
+							.find(file => fs.existsSync(path.join(certs_dir, file.replace('-key.pem', '.pem'))))
+					: undefined
 				warn_https = !key
 				if (key) {
 					const cert = key.replace('-key.pem', '.pem')
 					config.server = {
 						https: {
-							key: fs.readFileSync(path.join(root, key), 'utf8'),
-							cert: fs.readFileSync(path.join(root, cert), 'utf8')
+							key: fs.readFileSync(path.join(certs_dir, key), 'utf8'),
+							cert: fs.readFileSync(path.join(certs_dir, cert), 'utf8')
 						}
 					}
 				}
@@ -206,7 +211,7 @@ export function kitto(options: Options = {}): Plugin {
 			}
 			if (warn_https && command === 'serve')
 				logger.warn(
-					'[kitto] no mkcert pems found in the project root; starting without https (mkcert -install && mkcert localhost)'
+					`[kitto] no mkcert pems found in ${certs_dir}; starting without https (mkcert -install && mkcert localhost)`
 				)
 			if (is_bun && foreign_visitor)
 				logger.warn(

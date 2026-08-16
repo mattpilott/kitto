@@ -63,8 +63,7 @@
 				class="dot"
 				aria-label="Go to slide {i + 1}"
 				aria-current={basic.index === i ? 'true' : undefined}
-				onclick={() => basic.go_to(i)}
-			></button>
+				onclick={() => basic.go_to(i)}></button>
 		{/each}
 	</div>
 </section>

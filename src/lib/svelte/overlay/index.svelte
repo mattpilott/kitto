@@ -138,8 +138,7 @@
 			style:opacity={$overlay.opacity}
 			style:margin-top={$overlay.shift}
 			src={msrc || dsrc}
-			alt="Overlay"
-		/>
+			alt="Overlay" />
 	</picture>
 {/if}
 
