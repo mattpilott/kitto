@@ -43,6 +43,15 @@ describe('fluid typography visitor', () => {
 		expect(result!.raw).toBe('clamp(16px, 1.0000rem + ((1vw - 0.0px) * 1.0013), 2rem)')
 	})
 
+	it('defaults to a 360px minimum viewport', () => {
+		const result = fluid().Function.fluid({
+			name: 'fluid',
+			arguments: [create_mock_argument(1, 'rem'), {} as never, create_mock_argument(2, 'rem')]
+		})
+
+		expect(result!.raw).toBe('clamp(1rem, 1.0000rem + ((1vw - 3.6px) * 1.2924), 2rem)')
+	})
+
 	it('works with custom vmin, vmax, and root values', () => {
 		fluid_visitor = fluid({ vmin: 320, vmax: 1920, root: 18 })
 		const result = fluid_visitor.Function.fluid({
@@ -78,6 +87,35 @@ describe('fluid typography visitor', () => {
 		})
 
 		expect(result!.raw).toBe('clamp(1.2rem, 1.2000rem + ((1vw - 0.0px) * 1.3016), 2.5rem)')
+	})
+
+	it('handles negative values', () => {
+		fluid_visitor = fluid({ vmin: 320, vmax: 1600, root: 16 })
+		const result = fluid_visitor.Function.fluid({
+			name: 'fluid',
+			arguments: [create_mock_argument(-1.5, 'rem'), {} as never, create_mock_argument(-2.5, 'rem')]
+		})
+
+		// -1.5rem at 320px wide, -2.5rem at 1600px, so the clamp bounds are the other way round
+		expect(result!.raw).toBe('clamp(-2.5rem, -1.5000rem + ((1vw - 3.2px) * -1.2520), -1.5rem)')
+	})
+
+	it('handles a scale that crosses zero', () => {
+		const result = fluid_visitor.Function.fluid({
+			name: 'fluid',
+			arguments: [create_mock_argument(-1, 'rem'), {} as never, create_mock_argument(1, 'rem')]
+		})
+
+		expect(result!.raw).toBe('clamp(-1rem, -1.0000rem + ((1vw - 0.0px) * 2.0025), 1rem)')
+	})
+
+	it('handles a scale that shrinks as the viewport grows', () => {
+		const result = fluid_visitor.Function.fluid({
+			name: 'fluid',
+			arguments: [create_mock_argument(2, 'rem'), {} as never, create_mock_argument(1, 'rem')]
+		})
+
+		expect(result!.raw).toBe('clamp(1rem, 2.0000rem + ((1vw - 0.0px) * -1.0013), 2rem)')
 	})
 
 	it('handles zero as minimum value', () => {
