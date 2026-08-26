@@ -1,13 +1,17 @@
-import type { CustomAtRules, MediaQuery, Visitor } from 'lightningcss'
+import type { CustomAtRules, MediaCondition, MediaQuery, Visitor } from 'lightningcss'
 
 /**
  * @module breakpoints
  * @group LightningCSS
- * @version 3.0.0
+ * @version 3.1.0
  * @remarks Generates a media query handler for custom breakpoints. Queries use
  * `(--from-<breakpoint>)` for min-width, `(--until-<breakpoint>)` for max-width and
  * `(--only-<breakpoint>)` for the range from that breakpoint until the next one up
  * (open-ended on the largest); any other prefix on a known breakpoint throws at build time.
+ *
+ * Breakpoints may appear anywhere in the condition — combined with ordinary features,
+ * negated, or nested in a group — and the media type and qualifier are preserved, so
+ * `@media print and (--from-md)` stays a print query.
  *
  * @param breakpoints - An object containing breakpoint values.
  * @returns An object with a Rule containing the media function.
@@ -16,57 +20,61 @@ import type { CustomAtRules, MediaQuery, Visitor } from 'lightningcss'
 export const breakpoints = (breakpoints: Record<string, number>) =>
 	({
 		MediaQuery(query: MediaQuery) {
-			const operator = query.condition && 'operator' in query.condition ? query.condition.operator : 'and'
-			const conditions = query.condition && 'conditions' in query.condition ? query.condition.conditions : []
-			const value = query.condition && 'value' in query.condition ? query.condition.value : undefined
+			let changed = false
 
-			const conds = value ? [{ value }] : (conditions ?? [])
-			const queries: Array<string> = []
-
-			for (const item of conds) {
-				if (!('value' in item)) return query
-				if (!('name' in item.value)) return query
-				if (!item.value.name.startsWith('--')) return query
-
-				const name = item.value.name.replace('--', '').split('-').pop()
-				if (!name) return query
-
-				if (!Object.prototype.hasOwnProperty.call(breakpoints, name)) return query
-			}
-
-			conds.forEach(cond => {
-				if (!('value' in cond) || !('name' in cond.value)) return
-				const { name } = cond.value
-				const [prefix, device] = name.split('--').pop()?.split('-') ?? []
-
-				if (prefix === 'from' || prefix === 'until') {
-					const minmax = prefix === 'from' ? 'min' : 'max'
-					const point = breakpoints[device] - ~~(prefix !== 'from')
-
-					queries.push(`(${minmax}-width: ${point / 16}em)`)
-				} else if (prefix === 'only') {
-					// span from this breakpoint until just before the next one up;
-					// the largest breakpoint has nothing above, so it stays open-ended
-					const from = breakpoints[device]
-					const next = Math.min(...Object.values(breakpoints).filter(value => value > from))
-					const range = Number.isFinite(next)
-						? `(min-width: ${from / 16}em) and (max-width: ${(next - 1) / 16}em)`
-						: `(min-width: ${from / 16}em)`
-
-					queries.push(conds.length > 1 ? `(${range})` : range)
-				} else {
-					const target = device ?? prefix
-					throw new Error(
-						`[kitto] unknown breakpoint query (${name}); use (--from-${target}) for min-width, (--until-${target}) for max-width or (--only-${target}) for just that range`
-					)
+			// range syntax, which lightningcss lowers back to min-/max-width for older targets
+			const width = (operator: 'greater-than-equal' | 'less-than-equal', px: number): MediaCondition => ({
+				type: 'feature',
+				value: {
+					type: 'range',
+					name: 'width',
+					operator,
+					value: { type: 'length', value: { type: 'value', value: { unit: 'em', value: px / 16 } } }
 				}
 			})
 
-			if (!queries.length) return query
+			const visit = (condition: MediaCondition): MediaCondition => {
+				if (condition.type === 'not') return { type: 'not', value: visit(condition.value) }
+				if (condition.type === 'operation')
+					return { ...condition, conditions: condition.conditions.map(visit) }
+				if (condition.type !== 'feature') return condition
 
-			const raw = queries.join(queries.length > 1 ? ` ${operator} ` : '')
+				const name = String(condition.value.name)
+				if (!name.startsWith('--')) return condition
 
-			// Use ReturnedMediaQuery's raw-string form so LightningCSS can re-parse it.
-			return { raw }
+				const known = (key: string) => Object.hasOwn(breakpoints, key)
+				const [prefix, ...rest] = name.slice(2).split('-')
+				const device = rest.join('-')
+
+				if (known(device) && (prefix === 'from' || prefix === 'until' || prefix === 'only')) {
+					changed = true
+					const from = breakpoints[device]
+
+					if (prefix === 'from') return width('greater-than-equal', from)
+					if (prefix === 'until') return width('less-than-equal', from - 1)
+
+					// span from this breakpoint until just before the next one up;
+					// the largest breakpoint has nothing above, so it stays open-ended
+					const next = Math.min(...Object.values(breakpoints).filter(value => value > from))
+					const min = width('greater-than-equal', from)
+
+					return Number.isFinite(next)
+						? { type: 'operation', operator: 'and', conditions: [min, width('less-than-equal', next - 1)] }
+						: min
+				}
+
+				// a name pointing at a real breakpoint is a kitto query with a typo; anything
+				// else is someone else's custom media query, so leave it be
+				const target = known(device) ? device : known(name.slice(2)) ? name.slice(2) : ''
+				if (!target) return condition
+
+				throw new Error(
+					`[kitto] unknown breakpoint query (${name}); use (--from-${target}) for min-width, (--until-${target}) for max-width or (--only-${target}) for just that range`
+				)
+			}
+
+			const condition = query.condition ? visit(query.condition) : query.condition
+
+			return changed ? { ...query, condition } : query
 		}
 	}) satisfies Visitor<CustomAtRules>
